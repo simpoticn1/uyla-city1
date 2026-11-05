@@ -310,7 +310,7 @@ function yardPart(g, H, T, part) {
 }
 function banya(g, H, T, lit = ENV.lamps > 0.3 ? 1 : 0) { const bx = H.x - H.w / 2 + 0.6, bz = H.z + H.d + 2, y = ground(bz + 3) + 0.2; box(g, bx - 1.6, bx + 1.6, y, y + 2.4, bz, bz + 3, '#9a6a3a'); gableX(g, bx - 1.6, bx + 1.6, y + 2.4, bz, bz + 3, 1.2, '#5a4a3a', 0.3); windowAt(g, bx - 0.4, y + 1.1, 0.8, 0.6, bz, lit, T, 77); smoke(g, bx + 0.8, y + 3.6, bz + 1.5, T, 1); const p = proj(bx, y + 4.6, bz); g.font = `900 ${Math.max(12, 0.9 * cam.f / p[2])}px "Rubik"`; g.textAlign = 'center'; g.fillStyle = '#fff3dc'; g.strokeStyle = '#1e1628'; g.lineWidth = 4; g.strokeText('HAMMOM', p[0], p[1]); g.fillText('HAMMOM', p[0], p[1]); }
 let DUMMY = null;
-const ROUND = ['yurt', 'cucumber', 'pineapple', 'hut', 'apple', 'watermelon', 'tomato', 'strawberry', 'lemon', 'mushroom'];
+const ROUND = ['yurt', 'cucumber', 'pineapple', 'hut', 'apple', 'watermelon', 'tomato', 'strawberry', 'lemon', 'mushroom', 'burger'];
 export function house(g, H, T, a = 1, lit = 0, door = 0) {
   if (!H.lot || a < 1) return houseCore(g, H, T, a, lit, door);
   const backFirst = cam.z < H.z + H.d / 2; yardPart(g, H, T, backFirst ? 'back' : 'front'); const inf = houseCore(g, H, T, a, lit, door); if (inf) yardPart(g, H, T, backFirst ? 'front' : 'back'); return inf;
@@ -490,7 +490,7 @@ function yurt(g, H, q, T, lit) {
   if (q.k > 0.85) signBoard(g, H.x, q.y0 + 2.3, 4.6, 0.85, q.z0 - 0.5, H.nickname, '#f3e6c8');
   return { door: [H.x, q.y0, q.z0], roofTop: q.y0 + 4.8, top: q.y0 + 2.6 };
 }
-const FRUIT = { apple: { col: '#d8433a', top: 'leaf' }, watermelon: { col: '#3f8a3a', stripe: '#1f5a2a', wide: 1.1 }, tomato: { col: '#e0503a', top: 'star', wide: 1.12 }, strawberry: { col: '#e0405a', seeds: '#f6e08a' }, lemon: { col: '#f2d23a', wide: 1.2, top: 'leaf' }, mushroom: { col: '#d8433a' } };
+const FRUIT = { apple: { col: '#d8433a', top: 'leaf' }, watermelon: { col: '#3f8a3a', stripe: '#1f5a2a', wide: 1.1 }, tomato: { col: '#e0503a', top: 'star', wide: 1.12 }, strawberry: { col: '#e0405a', seeds: '#f6e08a' }, lemon: { col: '#f2d23a', wide: 1.2, top: 'leaf' }, mushroom: { col: '#d8433a' }, burger: { col: '#e0a050' } };
 function blob(g, H, q, T, lit, kind) {   // огурец / ананас / хижина — объёмные формы в экранных координатах
   const c = proj(H.x, q.y0, q.z0 + 3), s = cam.f / c[2], hh = (kind === 'cucumber' ? 10 : kind === 'pineapple' ? 7.5 : FRUIT[kind] ? 7.8 : 4.2) * s * q.hm, ww = (kind === 'cucumber' ? 5.2 : kind === 'pineapple' ? 6.6 : FRUIT[kind] ? 7.4 : 6.4) * s;
   g.lineWidth = Math.max(1.2, 0.08 * s); g.strokeStyle = '#3a1a3a';
@@ -498,7 +498,14 @@ function blob(g, H, q, T, lit, kind) {   // огурец / ананас / хиж
   else if (kind === 'pineapple') { g.fillStyle = '#e8a83a'; g.beginPath(); g.ellipse(c[0], c[1] - hh / 2, ww / 2, hh / 2, 0, 0, 7); g.fill(); g.stroke(); g.save(); g.clip(); g.strokeStyle = 'rgba(140,80,20,0.7)'; for (let i = -8; i <= 8; i++) { g.beginPath(); g.moveTo(c[0] + i * 0.9 * s - hh, c[1]); g.lineTo(c[0] + i * 0.9 * s + hh, c[1] - hh); g.stroke(); g.beginPath(); g.moveTo(c[0] + i * 0.9 * s + hh, c[1]); g.lineTo(c[0] + i * 0.9 * s - hh, c[1] - hh); g.stroke(); } g.restore();
     g.fillStyle = '#4f8a3a'; for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(c[0] + i * 0.35 * s, c[1] - hh * 0.95); g.quadraticCurveTo(c[0] + i * 0.9 * s, c[1] - hh - 1.4 * s, c[0] + i * 1.1 * s, c[1] - hh - (2.6 - Math.abs(i) * 0.4) * s); g.lineTo(c[0] + i * 0.15 * s, c[1] - hh * 0.92); g.fill(); g.stroke(); } }
   else if (FRUIT[kind]) { const F = FRUIT[kind];
-    if (kind === 'mushroom') { g.fillStyle = '#f2ead8'; g.beginPath(); g.roundRect(c[0] - ww * 0.3, c[1] - hh * 0.62, ww * 0.6, hh * 0.62, 0.4 * s); g.fill(); g.stroke();
+    if (kind === 'burger') { const L = (y, h, col, r) => { g.fillStyle = col; g.beginPath(); g.roundRect(c[0] - ww * 0.56, c[1] - hh * y - hh * h, ww * 1.12, hh * h, r * s); g.fill(); g.stroke(); };
+      L(0, 0.22, '#d89a4a', 0.9); L(0.22, 0.17, '#6a3a1e', 0.6);
+      g.fillStyle = '#f6c63a'; g.beginPath(); g.moveTo(c[0] - ww * 0.58, c[1] - hh * 0.41); for (let i = 0; i <= 8; i++) { const x = c[0] - ww * 0.58 + ww * 1.16 * i / 8; g.lineTo(x, c[1] - hh * 0.41); g.lineTo(x + ww * 0.07, c[1] - hh * (i % 2 ? 0.33 : 0.36)); } g.lineTo(c[0] + ww * 0.58, c[1] - hh * 0.41); g.lineTo(c[0] + ww * 0.58, c[1] - hh * 0.45); g.lineTo(c[0] - ww * 0.58, c[1] - hh * 0.45); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#5fb84a'; g.beginPath(); g.moveTo(c[0] - ww * 0.6, c[1] - hh * 0.45); for (let i = 0; i <= 12; i++) g.quadraticCurveTo(c[0] - ww * 0.6 + ww * 1.2 * (i - 0.5) / 12, c[1] - hh * (i % 2 ? 0.43 : 0.47), c[0] - ww * 0.6 + ww * 1.2 * i / 12, c[1] - hh * 0.45); g.lineTo(c[0] + ww * 0.6, c[1] - hh * 0.51); g.lineTo(c[0] - ww * 0.6, c[1] - hh * 0.51); g.closePath(); g.fill(); g.stroke();
+      L(0.51, 0.06, '#e0503a', 0.3);
+      g.fillStyle = F.col; g.beginPath(); g.ellipse(c[0], c[1] - hh * 0.57, ww * 0.58, hh * 0.43, 0, Math.PI, 0); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#fff4d0'; for (let i = 0; i < 14; i++) { const ang = Math.PI + (0.15 + 0.7 * H01(i * 5.3)) * Math.PI, rr = 0.3 + 0.55 * H01(i * 9.1); g.beginPath(); g.ellipse(c[0] + Math.cos(ang) * ww * 0.5 * rr, c[1] - hh * 0.57 + Math.sin(ang) * hh * 0.38 * rr, 0.22 * s, 0.12 * s, ang, 0, 7); g.fill(); } }
+    else if (kind === 'mushroom') { g.fillStyle = '#f2ead8'; g.beginPath(); g.roundRect(c[0] - ww * 0.3, c[1] - hh * 0.62, ww * 0.6, hh * 0.62, 0.4 * s); g.fill(); g.stroke();
       g.fillStyle = F.col; g.beginPath(); g.ellipse(c[0], c[1] - hh * 0.6, ww * 0.62, hh * 0.45, 0, Math.PI, 0); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#fff6e4'; for (const [dx, dy, r] of [[-0.3, 0.75, 0.5], [0.15, 0.85, 0.42], [0.38, 0.68, 0.35], [-0.05, 0.68, 0.3]]) { g.beginPath(); g.arc(c[0] + dx * ww, c[1] - hh * dy, r * s, 0, 7); g.fill(); } }
     else { g.fillStyle = F.col; g.beginPath(); if (kind === 'strawberry') { g.moveTo(c[0], c[1]); g.bezierCurveTo(c[0] - ww * 0.75, c[1] - hh * 0.4, c[0] - ww * 0.6, c[1] - hh, c[0], c[1] - hh * 0.95); g.bezierCurveTo(c[0] + ww * 0.6, c[1] - hh, c[0] + ww * 0.75, c[1] - hh * 0.4, c[0], c[1]); } else g.ellipse(c[0], c[1] - hh / 2, ww / 2 * (F.wide || 1), hh / 2, 0, 0, 7); g.fill(); g.stroke();
       g.save(); g.clip(); if (F.stripe) { g.strokeStyle = F.stripe; g.lineWidth = 0.7 * s; for (let i = -3; i <= 3; i++) { g.beginPath(); g.ellipse(c[0], c[1] - hh / 2, Math.abs(i) * ww * 0.15 + 0.1, hh / 2, 0, 0, 7); g.stroke(); } }

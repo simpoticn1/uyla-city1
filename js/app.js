@@ -133,7 +133,7 @@ function showInfo(h) {
   $('#nbrs').hidden = true; $('#nbtn').textContent = 'Qoʻshnilar ▾';
   $('#nbrs').innerHTML = neighbours(h).map((x) => `<button class="chip" data-n="${x.nickname}">${x.nickname}</button>`).join('');
   $('#nick').textContent = h.nickname; $('#addr').textContent = `${h.street}-koʻcha · ${h.num || 1}-uy`;
-  $('#status').textContent = h.status === 'dark' ? 'Chiroq oʻchgan: egasi ketib qoldi. Qaytib kel — u yana yonadi.' : (h.rank < 6 || h.id <= 6 ? 'Shaharning ilk aholisidan biri.' : `${HOUSES.length} aholidan №${h.id}`);
+  $('#status').textContent = h.status === 'dark' ? 'Chiroq oʻchiq. @uyla.city ga obuna boʻl — va u yonadi!' : (h.rank < 6 || h.id <= 6 ? 'Shaharning ilk aholisidan biri.' : `${HOUSES.length} aholidan №${h.id}`);
   info.hidden = false; history.replaceState(null, '', '#' + h.nickname); requestAnimationFrame(placeBars);
 }
 $('#wf').addEventListener('submit', (e) => { e.preventDefault(); const v = $('#wq').value.trim(); if (!v) return; $('#q').value = v; $('#welcome').classList.add('gone'); find(v); });
