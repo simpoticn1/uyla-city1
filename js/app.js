@@ -20,7 +20,7 @@ const KF = {   // sky[5], haze, hazeFar, tint, lit, lamps, stars, sunY, clouds[3
 const WX = { tint: 'rgb(118,130,200)', lit: 1, code: null, temp: null, kind: 'clear', name: '' };
 function sunTimes(d) { const doy = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 864e5), len = 12.2 + 3.1 * Math.cos(2 * Math.PI * (doy - 172) / 365), noon = 12.55; return [noon - len / 2, noon + len / 2]; }
 function applyWX() {
-  const d = new Date(), QP = new URLSearchParams(location.search), h = QP.get('h') != null ? +QP.get('h') : d.getHours() + d.getMinutes() / 60, [rise, set] = sunTimes(d); if (QP.get('wx')) WX.kind = QP.get('wx');
+  const d = new Date(), QP = new URLSearchParams(location.search), h = QP.get('h') != null ? +QP.get('h') : 15, [rise, set] = sunTimes(d); if (QP.get('wx')) WX.kind = QP.get('wx');
   const keys = [[0, 'night'], [rise - 1, 'night'], [rise - 0.2, 'dawn'], [rise + 1.4, 'morning'], [12.5, 'noon'], [set - 1.5, 'after'], [set, 'sunset'], [set + 0.8, 'dusk'], [set + 2, 'night'], [24, 'night']];
   let i = 0; while (i < keys.length - 2 && h >= keys[i + 1][0]) i++;
   const [h0, a] = keys[i], [h1, b] = keys[i + 1], k = h1 > h0 ? clamp((h - h0) / (h1 - h0)) : 0, A = KF[a], B = KF[b], m = (x, y) => mix(x, y, k), n = (x, y) => x + (y - x) * k;
