@@ -4,7 +4,9 @@ import { E, clamp, lerp } from './core.js';
 
 // ---------- цвет ----------
 const hexRGB = (h) => { if (h[0] === 'r') return h.slice(h.indexOf('(') + 1, -1).split(',').map(Number); const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
-export const mix = (a, b, k) => { const A = hexRGB(a), B = hexRGB(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * clamp(k))).join(',')})`; };
+const MIXC = new Map();   // кэш смешивания цветов: раньше съедал 15% кадра
+export const mix = (a, b, k) => { k = Math.round(clamp(k) * 64) / 64; const key = a + '|' + b + '|' + k; let r = MIXC.get(key); if (r) return r;
+  const A = hexRGB(a), B = hexRGB(b); r = `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(',')})`; if (MIXC.size > 60000) MIXC.clear(); MIXC.set(key, r); return r; };
 const shade = (c, k) => k >= 0 ? mix(c, '#fff4e0', k) : mix(c, '#1a1226', -k);
 export let HAZE = '#d79a86', HAZE_FAR = '#b98aa0';
 export function setHaze(a, b) { HAZE = a; HAZE_FAR = b; }
@@ -676,7 +678,7 @@ const fadeZ = (x, z) => (x > PLAZA.x0 && x < PLAZA.x1 ? clamp(Math.min(Math.abs(
 const HC = ['#f4f4f4', '#f4f4f4', '#e8e4dc', '#c8ccd2', '#1e1e24', '#f4f4f4', '#2e86c1', '#c0392b', '#f4f4f4', '#9aa0a8', '#3a4a5a', '#f4f4f4'];   // в Ташкенте почти все машины белые
 const carType = (sd, bus) => { const t = Math.floor(sd * 997) % 20; return bus && t < 3 ? 4 : t < 4 ? 3 : t < 7 ? 2 : t < 10 ? 1 : 0; };   // 3 — жёлтое такси, 2 — белый минивэн, 4 — автобус
 // всё, что двигается рядом с камерой: машины по полосам и люди по тротуарам — позиция = функция времени
-export function movers(T, R = 210) {
+export function movers(T, R = 150) {
   const out = [], jz = Math.round(cam.z / 32), bx = Math.round((cam.x + 5) / 138);
   const lane = (key, a, b, P, v, ph, mk) => { const off = ph + v * T; for (let k = Math.floor((a - off) / P) - 1; k <= Math.ceil((b - off) / P) + 1; k++) { const s = off + k * P; if (s < a || s > b) continue; const sd = H01(key * 13.7 + k * 7.31); if (sd < 0.35) continue; mk(s, sd, k); } };
   for (let j = jz - 8; j <= jz + 8; j++) { const z = j * 32; if (z < -560 || z > 520 || Math.abs(z + 5 - cam.z - 60) > R) continue; const a = Math.max(-560, cam.x - R), b = Math.min(560, cam.x + R);
@@ -755,7 +757,8 @@ export function streetSign(g, q) {
   for (let k = 0; k <= 8; k++) { const x = x0 + k * 16; if (Math.abs(x) < 40 && z > -100 && z < -10) continue; if (H01(x * 0.71 + j * 1.3) < 0.18) continue; PROPS.push({ kind: 'chinar', x, z: z + 9.9, seed: n++, s: 0.85 + H01(x + j) * 0.35 }); }
   if (((j % 2) + 2) % 2 === 0 && !(Math.abs(x0 + 64) < 40 && z > -100 && z < -10)) PROPS.push({ kind: 'stop', x: x0 + 64, z: z + 9.3, seed: n++ }); } } })();
 function chinar(g, x, z, sc, T, seed) {   // чинара: светлый пятнистый ствол, широкая пышная крона
-  const y0 = ground(z), b = proj(x, y0, z); if (b[2] < 2 || b[2] > 420) return; const s = cam.f / b[2] * sc, fz = fog(b[2]);
+  const y0 = ground(z), b = proj(x, y0, z); if (b[2] < 2 || b[2] > 300) return; const s = cam.f / b[2] * sc, fz = fog(b[2]);
+  if (b[2] > 130) { g.fillStyle = mix('#4a7c34', HAZE, fz); g.fillRect(b[0] - 0.2 * s, b[1] - 5 * s, 0.4 * s, 5 * s); g.beginPath(); g.arc(b[0], b[1] - 7 * s, 2.8 * s, 0, 7); g.fill(); return; }
   if (b[2] < 140) { g.fillStyle = 'rgba(30,40,20,0.18)'; g.beginPath(); g.ellipse(b[0], b[1], 2.6 * s, 0.7 * s, 0, 0, 7); g.fill(); }
   g.fillStyle = mix('#cdbfa4', HAZE, fz); g.beginPath(); g.moveTo(b[0] - 0.35 * s, b[1]); g.lineTo(b[0] - 0.22 * s, b[1] - 5 * s); g.lineTo(b[0] + 0.22 * s, b[1] - 5 * s); g.lineTo(b[0] + 0.35 * s, b[1]); g.closePath(); g.fill();
   if (b[2] < 120) { g.fillStyle = mix('#8a7a60', HAZE, fz); for (let i = 0; i < 4; i++) { g.beginPath(); g.ellipse(b[0] + (H01(seed + i) - 0.5) * 0.4 * s, b[1] - (0.8 + i * 1.1) * s, 0.12 * s, 0.22 * s, 0, 0, 7); g.fill(); } }
@@ -830,7 +833,7 @@ function panelBlock(g, B, T, lit) {
   const { x, z, w, d, col, seed } = B, y0 = ground(z), fh = 2.9, H = fh * B.h + 0.6, x0 = x - w / 2, x1 = x + w / 2, c = proj(x, y0 + H / 2, z); if (c[2] < 2 || c[2] > 900) return;
   box(g, x0, x1, y0, y0 + H, z, z + d, col, { topCol: shade(col, -0.25) });
   box(g, x0 - 0.2, x1 + 0.2, y0 + H, y0 + H + 0.35, z - 0.2, z + d + 0.2, shade(col, -0.35));
-  if (c[2] > 420) { for (let f = 1; f < B.h; f++) onFront(g, x0, y0 + f * fh, w, 0.12, z - 0.01, shade(col, -0.15), 0); return; }
+  if (c[2] > 230) { for (let f = 1; f < B.h; f++) onFront(g, x0, y0 + f * fh, w, 0.12, z - 0.01, shade(col, -0.15), 0); return; }
   const nw = Math.round(w / 3.3), cw = w / nw;
   for (let f = 0; f < B.h; f++) for (let k = 0; k < nw; k++) { const wx = x0 + k * cw, wy = y0 + 0.6 + f * fh, on = lit > 0.3 && H01(seed * 31 + f * 7 + k) < 0.55;
     onFront(g, wx + cw * 0.2, wy + 0.8, cw * 0.6, 1.3, z - 0.02, on ? '#ffd890' : '#4a5a74', on ? 0.1 : 0.12);

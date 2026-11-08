@@ -45,7 +45,7 @@ let target = null, fly = null, drag = null;
 const OVER = { x: 0, y: 70, z: -230, p: 0.28, f: 1000, yaw: 0 };
 const houseCam = (h) => { const tall = ['tower', 'penthouse', 'cucumber', 'garden', 'mansion'].includes(h.type) ? 3 : 0; const wide = E.W > E.H; return { x: h.x + 1.5, y: ground(h.z) + (wide ? 16 : 11) + tall, z: h.z - (wide ? 27 : 21) - tall * 1.5, p: wide ? 0.42 : 0.3, f: 900 }; };
 const C = { ...OVER }; setCam(C);
-function resize() { const r = Math.min(devicePixelRatio || 1, 2), w = innerWidth, h = innerHeight; cv.width = Math.round(w * r); cv.height = Math.round(h * r); cv.style.width = w + 'px'; cv.style.height = h + 'px'; if (w / h > 1080 / 1920) { E.H = 1920; E.W = Math.round(1920 * w / h); } else { E.W = 1080; E.H = Math.round(1080 * h / w); } E.PX = cv.width / E.W; dirty = true; }
+function resize() { const r = Math.min(devicePixelRatio || 1, 1.5), w = innerWidth, h = innerHeight; cv.width = Math.round(w * r); cv.height = Math.round(h * r); cv.style.width = w + 'px'; cv.style.height = h + 'px'; if (w / h > 1080 / 1920) { E.H = 1920; E.W = Math.round(1920 * w / h); } else { E.W = 1080; E.H = Math.round(1080 * h / w); } E.PX = cv.width / E.W; dirty = true; }
 let dirty = true; addEventListener('resize', resize);
 
 function card(g, txt, x, y, size, o = {}) {
@@ -59,13 +59,14 @@ function safe(g) { if (g.__safe) return; const oe = g.ellipse, oa = g.arc, og = 
 // мир рисуем на отдельном слое: ночной тон ложится на дома целиком, без полосы по линии горизонта
 const WL = document.createElement('canvas'), WM = document.createElement('canvas');
 function drawWorld(G, T, opt = {}) {
-  const cw = G.canvas.width, ch = G.canvas.height; for (const c of [WL, WM]) if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; }
-  let g = WL.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cw, ch); g.setTransform(G.getTransform()); safe(g);
+  const cw = G.canvas.width, ch = G.canvas.height; if (!WX.tint.match(/\d+/g).map(Number).every((v) => v >= 226)) for (const c of [WL, WM]) if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; }
+  const tw = WX.tint.match(/\d+/g).map(Number), plain = tw.every((v) => v >= 226);   // днём тон почти белый — рисуем сразу на экран, без лишних слоёв
+  let g = plain ? G : WL.getContext('2d'); if (!plain) { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cw, ch); g.setTransform(G.getTransform()); safe(g); }
   G.save(); sky(G, T); const hz = horizon(G, T); G.restore();
   terrain(g, T, {}); aryks(g, T); anhor(g, T); temurGround(g); lake(g, T); if (opt.plaza !== false) plaza(g, T, [1, 1, 1, 1, 1]);
   const vis = []; for (const h of HOUSES) { const c = proj(h.x, ground(h.z) + 3, h.z + 3); if (c[2] < 2 || c[2] > 1300 || c[0] < -200 || c[0] > E.W + 200 || c[1] < -400 || c[1] > E.H + 300) continue; vis.push([h, c[2]]); }
   for (const d of DACHAS) { const c = proj(d.x, ground(d.z) + 3, d.z + 3); if (c[2] > 2 && c[2] < 600) vis.push([d, c[2], 'd']); }
-  for (const q of PROPS) { const c = proj(q.x, ground(q.z), q.z); if (c[2] > 1 && c[2] < 600) vis.push([q, c[2], 'p']); }
+  { const fwd = Math.cos(cam.yaw || 0) > 0.9; for (const q of PROPS) { const dx = q.x - cam.x, dz = q.z - cam.z, lim = q.kind === 'lamp' ? 260 : q.kind === 'chinar' ? 300 : q.kind === 'stop' ? 200 : 600; if (dx > lim || dx < -lim || dz > lim || dz < -lim || (fwd && dz < -12)) continue; const c = proj(q.x, ground(q.z), q.z); if (c[2] > 1 && c[2] < lim && c[0] > -300 && c[0] < E.W + 300) vis.push([q, c[2], 'p']); } }
   if (opt.life !== false) { for (const q of movers(T)) { const c = proj(q.x, ground(q.z) + 0.8, q.z); if (c[2] > 2 && c[2] < 380 && c[0] > -150 && c[0] < E.W + 150) vis.push([q, c[2], 't']); } for (const q of signs()) { const c = proj(q.x, ground(q.z), q.z); if (c[2] > 3 && c[2] < 150) vis.push([q, c[2], 's']); } }
   { const c = proj(TEMUR.x, ground(TEMUR.z) + 3, TEMUR.z); if (c[2] > 2) vis.push([null, c[2], 'tm']); }
   { const c = proj(CHORSU.x, ground(CHORSU.z) + 3, CHORSU.z + 2); if (c[2] > 2) vis.push([{ kind: 'chorsu' }, c[2], 'lm']); }
@@ -79,15 +80,15 @@ function drawWorld(G, T, opt = {}) {
     if ((!opt.onlyHero && zc < (opt.tagDist || 60)) || h === opt.hero) { const p = proj(h.x, inf.roofTop + 1.2, h.z + 1); if (p[2] > 2) tags.push([h, p[0], p[1], h === opt.hero ? 54 : clamp(cam.f / p[2] * 1.1, 22, 40)]); } }
   if (opt.ghost && GHOST) { const x = GHOST.x, z = GHOST.z, b = ground(z + 7) + 0.3, P8 = [[x - 3.8, b, z], [x + 3.8, b, z], [x + 3.8, b + 5, z], [x - 3.8, b + 5, z], [x, b + 7.5, z]].map((q) => proj(...q));
     if (P8.every((q) => q[2] > 1)) { g.save(); g.setLineDash([10, 9]); g.strokeStyle = '#ffe2a0'; g.lineWidth = 4; g.beginPath(); g.moveTo(P8[0][0], P8[0][1]); g.lineTo(P8[1][0], P8[1][1]); g.lineTo(P8[2][0], P8[2][1]); g.lineTo(P8[4][0], P8[4][1]); g.lineTo(P8[3][0], P8[3][1]); g.closePath(); g.stroke(); g.restore(); const c = proj(x, b + 2.5, z + 3); addLight(c[0], c[1], 150, '255,214,140', 0.3); const t = proj(x, b + 9.5, z); tagsGhost = [opt.ghost, t[0], t[1]]; } }
-  { const m = WM.getContext('2d'); m.setTransform(1, 0, 0, 1, 0, 0); m.clearRect(0, 0, cw, ch); m.drawImage(WL, 0, 0);
+  if (!plain) { const m = WM.getContext('2d'); m.setTransform(1, 0, 0, 1, 0, 0); m.clearRect(0, 0, cw, ch); m.drawImage(WL, 0, 0);
     g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.fillStyle = WX.tint; g.fillRect(0, 0, cw, ch); g.globalCompositeOperation = 'destination-in'; g.drawImage(WM, 0, 0); g.restore(); }
-  G.save(); G.setTransform(1, 0, 0, 1, 0, 0); G.drawImage(WL, 0, 0); G.restore(); g = G; setOCC(opt.pick && opt.pick.length ? opt.pick : null); drawLights(g); setOCC(null);
+  if (!plain) { G.save(); G.setTransform(1, 0, 0, 1, 0, 0); G.drawImage(WL, 0, 0); G.restore(); } g = G; setOCC(opt.pick && opt.pick.length ? opt.pick : null); drawLights(g); setOCC(null);
   { const hgt = cam.y - ground(cam.z + 40); if (hgt > 45 && !opt.hero) { const a = clamp((hgt - 45) / 40); for (const [n, x, z] of DCENT) { const p = proj(x, ground(z) + 25, z); if (p[2] < 5 || p[2] > 900 || p[0] < -100 || p[0] > E.W + 100 || p[1] < 0 || p[1] > E.H) continue; const fs = clamp(16000 / p[2], 18, 46); g.save(); g.globalAlpha = a; g.font = `900 ${fs}px Rubik`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round'; g.lineWidth = fs / 4; g.strokeStyle = 'rgba(30,22,40,0.8)'; g.strokeText(n.toUpperCase(), p[0], p[1]); g.fillStyle = '#ffe9b8'; g.fillText(n.toUpperCase(), p[0], p[1]); g.restore(); } } }
   tags.sort((a, b) => (a[0] === opt.hero) - (b[0] === opt.hero) || a[3] - b[3]);
   if (opt.ghost && tagsGhost) { card(g, opt.ghost + '?', tagsGhost[1], tagsGhost[2] - 54, 54, { bg: '#ffcf7a' }); tagsGhost = null; }
   const placed = []; for (const [h, x, y, s] of tags.reverse()) { if (y < 60 || y > E.H - 40) continue; g.font = `900 ${s}px Rubik`; const w = g.measureText(h.nickname).width + s; const r = [x - w / 2, y - s * 1.8, x + w / 2, y]; if (placed.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) continue; placed.push(r); card(g, h.nickname, x, y - s, s, { bg: h === opt.hero ? '#ffcf7a' : '#fff6e4', alpha: h.status === 'dark' ? 0.6 : 1 }); }
 }
-let T0 = performance.now(), lastMove = 1, hiq = false, lastDraw = 0, DT = 30, ANIM_MS = 50;
+let T0 = performance.now(), lastMove = 1, hiq = false, lastDraw = 0, DT = 30, ANIM_MS = 100;
 function frame(now) {
   const T = (now - T0) / 1000;
   if (fly) { const k = clamp((now - fly.t0) / fly.d), e = ease.inOut(k); const a = fly.a, b = fly.b, up = Math.sin(k * Math.PI) * fly.hop;
@@ -96,9 +97,9 @@ function frame(now) {
   // город живёт: машины и люди двигаются, кадр перерисовываем постоянно (частота подстраивается под телефон)
   if (ROOM) { requestAnimationFrame(frame); return; }
   if (!dirty && now - lastDraw > ANIM_MS && C.y - ground(C.z + 40) < 260 && !document.hidden) dirty = true;
-  if (dirty) { setLOD(hiq ? 320 : 150); setCam(C); g.setTransform(E.PX, 0, 0, E.PX, 0, 0);
+  if (dirty) { setLOD(hiq ? 260 : 150); setCam(C); g.setTransform(E.PX, 0, 0, E.PX, 0, 0);
     safe(g); const t0 = performance.now();
-    PICK = []; drawWorld(g, T, { pick: PICK, ghost: ghostNick, hero: target, hide: target ? hideFor(target) : (ghostNick && GHOST ? (h) => h.z < GHOST.z - 1 && h.z > GHOST.z - 40 && Math.abs(h.x - GHOST.x) < 22 : null) }); dirty = false; lastDraw = now; const dt = performance.now() - t0; DT = DT * 0.9 + dt * 0.1; ANIM_MS = clamp(DT * 2.2, 33, 160); window.__dt = DT; }
+    PICK = []; drawWorld(g, T, { pick: PICK, ghost: ghostNick, hero: target, hide: target ? hideFor(target) : (ghostNick && GHOST ? (h) => h.z < GHOST.z - 1 && h.z > GHOST.z - 40 && Math.abs(h.x - GHOST.x) < 22 : null) }); dirty = false; lastDraw = now; const dt = performance.now() - t0; DT = DT * 0.9 + dt * 0.1; ANIM_MS = DT > 90 ? 1e9 : clamp(DT * 2.5, 50, 250); window.__dt = DT; }
   requestAnimationFrame(frame);
 }
 const fx = document.getElementById('fx'), fg = fx.getContext('2d');
