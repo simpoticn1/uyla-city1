@@ -91,12 +91,8 @@ export function horizon(g, T) {
   ridge(g, hz, 260, 40, 1.3, (ENV.mt ? ENV.mt[0] : '#8a6a9a'), 24);   // дальние горы — холодные
   // снежные шапки — жёсткие пятна
   ridge(g, hz, 170, 10, 4.1, (ENV.mt ? ENV.mt[1] : '#6d5584'), 20);
-  // мачта-загадка
-  const m0 = proj(-60, ground(600), 600), m1 = proj(-60, ground(600) + 75, 600);
-  if (m0[2] > 1) { g.strokeStyle = '#3e2e52'; g.lineWidth = 3; g.beginPath(); g.moveTo(m0[0] - 6, m0[1]); g.lineTo(m1[0], m1[1]); g.lineTo(m0[0] + 6, m0[1]); g.stroke();
-    for (let i = 1; i < 6; i++) { const y = lerp(m0[1], m1[1], i / 6), w2 = 6 * (1 - i / 6); g.beginPath(); g.moveTo(m1[0] - w2, y); g.lineTo(m1[0] + w2, y); g.stroke(); }
-    const blink = Math.floor(T * 1.6) % 2; if (blink) { g.fillStyle = 'rgba(255,80,80,0.35)'; g.beginPath(); g.arc(m1[0], m1[1], 16, 0, 7); g.fill(); g.fillStyle = '#ff6a6a'; g.beginPath(); g.arc(m1[0], m1[1], 4, 0, 7); g.fill(); } }
   ridge(g, hz, 90, -6, 7.7, (ENV.mt ? ENV.mt[2] : '#4f3f62'), 16);    // ближние холмы
+  tashkentSkyline(g, T);
   // кромка леса: зубчатые ели жёсткой заливкой
   g.fillStyle = ENV.mt ? ENV.mt[3] : '#3a3048'; g.beginPath(); g.moveTo(-20, hz + 30);
   for (let x = -20; x <= E.W + 30; x += 14) { const h = 22 + 16 * Math.abs(Math.sin(x * 0.37 + 1.7)) + 10 * Math.abs(Math.sin(x * 0.11)); g.lineTo(x, hz + 6 - h); g.lineTo(x + 7, hz + 6); }
@@ -643,3 +639,246 @@ export function plaza(g, T, k = [1, 1, 1, 1, 1]) {
   return out;
 }
 
+
+// ---------- улицы Ташкента, машины, прохожие ----------
+// районы Ташкента по сторонам света (+z — север, +x — восток) и их настоящие улицы
+const DIST = {
+  'Shayxontohur': ['Navoiy', 'Beruniy', 'Qorasaroy', 'Zarqaynar', 'Gʻafur Gʻulom', 'Chorsu', 'Samarqand Darvoza', 'Labzak', 'Oʻrda', 'Gulbozor'],
+  'Mirobod': ['Mustaqillik', 'Afrosiyob', 'Oybek', 'Mirobod', 'Sayilgoh', 'Nukus', 'Taras Shevchenko', 'Movarounnahr', 'Istiqbol', 'Ashxobod'],
+  'Yakkasaroy': ['Shota Rustaveli', 'Bobur', 'Qushbegi', 'Bogʻibuston', 'Yakkasaroy', 'Abdulla Qahhor', 'Usmon Nosir', 'Kichik Beshyogʻoch', 'Mukimiy', 'Gʻaniy Arabov'],
+  'Yunusobod': ['Bogʻishamol', 'Yunusobod', 'Shahriston', 'Bodomzor', 'Ahmad Donish', 'Posira', 'Minor', 'Kichik Halqa', 'Iftixor', 'Navroʻz'],
+  'Mirzo Ulugʻbek': ['Mirzo Ulugʻbek', 'Universitet', 'Qorasu', 'Feruza', 'Sayram', 'Olimlar', 'Tolariq', 'Darxon', 'Buyuk Turon', 'Muminov'],
+  'Yashnobod': ['Parkent', 'Mashinasozlar', 'Aviasozlar', 'Fargʻona yoʻli', 'Toʻytepa', 'Elbek', 'Qoʻyliq', 'Tuzel', 'Yashnobod', 'Shifokorlar'],
+  'Bektemir': ['Bektemir', 'Husayn Boyqaro', 'Rohat', 'Suvsoz', 'Yangiobod', 'Doʻstlik', 'Bogʻzor', 'Xumo', 'Mehnat', 'Gulobod'],
+  'Sergeli': ['Sergeli', 'Yangi Sergeli', 'Qumariq', 'Choshtepa', 'Xonobod', 'Sputnik', 'Quyosh', 'Nilufar', 'Yangi hayot', 'Oqtepa'],
+  'Chilonzor': ['Bunyodkor', 'Muqimiy', 'Qatortol', 'Lutfiy', 'Gavhar', 'Chilonzor', 'Novza', 'Diydor', 'Choʻponota', 'Arnasoy'],
+  'Uchtepa': ['Uchtepa', 'Farhod', 'Nurafshon', 'Bogʻbon', 'Gulsanam', 'Shiroq', 'Lolazor', 'Kuyluk', 'Qoraqamish', 'Mevazor'],
+  'Olmazor': ['Farobiy', 'Sebzor', 'Olmazor', 'Talabalar', 'Sagʻbon', 'Kamolon', 'Qoraqamish', 'Shifobaxsh', 'Beshqayragʻoch', 'Oqqoʻrgʻon'] };
+export const DISTRICTS = Object.keys(DIST);
+export function districtOf(x, z) {
+  const r = Math.hypot(x, z + 40), th = Math.atan2(x, z + 40) * 180 / Math.PI;   // 0° — север, 90° — восток
+  if (r < 175) return z < -110 ? 'Yakkasaroy' : x < 0 ? 'Shayxontohur' : 'Mirobod';
+  if (th >= -30 && th < 30) return 'Yunusobod'; if (th >= 30 && th < 75) return 'Mirzo Ulugʻbek'; if (th >= 75 && th < 120) return 'Yashnobod'; if (th >= 120 && th < 160) return 'Bektemir';
+  if (th >= 160 || th < -160) return 'Sergeli'; if (th >= -160 && th < -115) return 'Chilonzor'; if (th >= -115 && th < -70) return 'Uchtepa'; return 'Olmazor';
+}
+const VN = { 0: 'Amir Temur shoh koʻchasi', 1: 'Buyuk Ipak yoʻli', '-1': 'Beruniy shoh koʻchasi', 2: 'Mustaqillik shoh koʻchasi', '-2': 'Bunyodkor shoh koʻchasi', 3: 'Fargʻona yoʻli', '-3': 'Farobiy koʻchasi', 4: 'Parkent koʻchasi', '-4': 'Qoraqamish koʻchasi' };
+export const rowOf = (z) => Math.round((z - 15) / 32);
+export function rowName(j, x = 0) { const d = districtOf(x, j * 32 + 15), L = DIST[d]; return L[((j % L.length) + L.length) % L.length] + ' koʻchasi'; }
+export function colName(b) { return VN[b] || 'Yangi koʻcha'; }
+export function addresses(houses) {   // адрес: район + улица перед домом + номер по порядку вдоль улицы
+  const by = new Map(); for (const h of houses) { const j = rowOf(h.z), d = districtOf(h.x, h.z), k = j + '|' + d; if (!by.has(k)) by.set(k, []); by.get(k).push(h); h.row = j; h.dist = d; }
+  for (const L of by.values()) { L.sort((a, b) => a.x - b.x); L.forEach((h, i) => { h.sname = rowName(h.row, h.x); h.snum = i + 1; h.addr = `${h.dist} t., ${h.sname}, ${i + 1}-uy`; }); }
+}
+export const TEMUR = { x: 0, z: -75, r: 13.5 };
+const inPlaza = (x, z) => x > PLAZA.x0 - 1 && x < PLAZA.x1 + 1 && z > PLAZA.z0 - 1 && z < PLAZA.z1 + 1;
+const fadeX = (x, z) => (z > PLAZA.z0 - 1 && z < PLAZA.z1 + 1 ? clamp(Math.min(Math.abs(x - PLAZA.x0), Math.abs(x - PLAZA.x1)) / 6) : 1);
+const fadeZ = (x, z) => (x > PLAZA.x0 && x < PLAZA.x1 ? clamp(Math.min(Math.abs(z - PLAZA.z0), Math.abs(z - PLAZA.z1)) / 6) : 1);
+const HC = ['#f4f4f4', '#f4f4f4', '#e8e4dc', '#c8ccd2', '#1e1e24', '#f4f4f4', '#2e86c1', '#c0392b', '#f4f4f4', '#9aa0a8', '#3a4a5a', '#f4f4f4'];   // в Ташкенте почти все машины белые
+const carType = (sd, bus) => { const t = Math.floor(sd * 997) % 20; return bus && t < 3 ? 4 : t < 4 ? 3 : t < 7 ? 2 : t < 10 ? 1 : 0; };   // 3 — жёлтое такси, 2 — белый минивэн, 4 — автобус
+// всё, что двигается рядом с камерой: машины по полосам и люди по тротуарам — позиция = функция времени
+export function movers(T, R = 210) {
+  const out = [], jz = Math.round(cam.z / 32), bx = Math.round((cam.x + 5) / 138);
+  const lane = (key, a, b, P, v, ph, mk) => { const off = ph + v * T; for (let k = Math.floor((a - off) / P) - 1; k <= Math.ceil((b - off) / P) + 1; k++) { const s = off + k * P; if (s < a || s > b) continue; const sd = H01(key * 13.7 + k * 7.31); if (sd < 0.35) continue; mk(s, sd, k); } };
+  for (let j = jz - 8; j <= jz + 8; j++) { const z = j * 32; if (z < -560 || z > 520 || Math.abs(z + 5 - cam.z - 60) > R) continue; const a = Math.max(-560, cam.x - R), b = Math.min(560, cam.x + R);
+    const bus = j % 4 === 0;
+    lane(j * 3 + 1, a, b, 46, 9 + H01(j) * 4, H01(j * 1.3) * 46, (x, sd) => { const zz = z + 2.9; if (!inPlaza(x, zz)) out.push({ k: 'cx', x, z: zz, dir: 1, c: HC[Math.floor(sd * 97) % HC.length], ty: carType(sd, bus), a: fadeX(x, zz) }); });
+    lane(j * 3 + 2, a, b, 52, -(8 + H01(j + 9) * 4), H01(j * 2.1) * 52, (x, sd) => { const zz = z + 5.2; if (!inPlaza(x, zz)) out.push({ k: 'cx', x, z: zz, dir: -1, c: HC[Math.floor(sd * 97) % HC.length], ty: carType(sd, bus), a: fadeX(x, zz) }); });
+    for (const [sz, dir, key] of [[z + 0.75, 1, 5], [z + 9.1, -1, 6], [z + 0.9, -1, 7], [z + 8.95, 1, 8]]) lane(j * 11 + key, a, b, 21, dir * (1.1 + H01(j + key) * 0.5), H01(j * 3 + key) * 21, (x, sd, k) => { if (!inPlaza(x, sz) && sd > 0.5) out.push({ k: 'p', x, z: sz, dir, sd, ph: k * 1.7, a: fadeX(x, sz) }); }); }
+  for (let b = bx - 3; b <= bx + 3; b++) { const x = -5 + b * 138; if (x < -560 || x > 560 || Math.abs(x - cam.x) > R) continue; const a = Math.max(-560, cam.z - 40), e = Math.min(520, cam.z + R + 60);
+    const ring = (lx, z) => { const dz = z + 2 - TEMUR.z, R = TEMUR.r - 2; return b === 0 && Math.abs(dz) < R ? Math.sign(lx) * Math.max(Math.abs(lx), Math.sqrt(R * R - dz * dz)) : lx; };   // объезд сквера Амира Темура
+    lane(b * 5 + 101, a, e, 40, 10, H01(b * 1.7) * 40, (z, sd) => { if (!inPlaza(x + 6, z)) out.push({ k: 'cz', x: x + 5 + ring(1.6, z), z, dir: 1, c: HC[Math.floor(sd * 97) % HC.length], ty: carType(sd, b === 0), a: fadeZ(x + 6, z) }); });
+    lane(b * 5 + 102, a, e, 44, -9.5, H01(b * 2.9) * 44, (z, sd) => { if (!inPlaza(x + 3, z)) out.push({ k: 'cz', x: x + 5 + ring(-1.6, z), z, dir: -1, c: HC[Math.floor(sd * 97) % HC.length], ty: carType(sd, b === 0), a: fadeZ(x + 3, z) }); });
+    for (const [px, dir, key] of [[x + 0.75, 1, 3], [x + 9.25, -1, 4]]) lane(b * 7 + key + 200, a, e, 19, dir * 1.3, H01(b + key) * 19, (z, sd, k) => { if (!inPlaza(px, z) && sd > 0.55 && !(b === 0 && Math.abs(z - TEMUR.z) < TEMUR.r + 1)) out.push({ k: 'p', x: px, z, dir: dir * 2, sd, ph: k * 2.3, a: fadeZ(px, z) }); }); }
+  return out;
+}
+function wheels(g, xs, y, z) { for (const wx of xs) { const q = proj(wx, y, z); if (q[2] > 1) { const r = 0.4 * cam.f / q[2]; g.fillStyle = '#1e1a24'; g.beginPath(); g.arc(q[0], q[1], r, 0, 7); g.fill(); g.fillStyle = '#9a9aa4'; g.beginPath(); g.arc(q[0], q[1], r * 0.42, 0, 7); g.fill(); } } }
+function carX(g, x, z, dir, c, ty) {   // машина вдоль x
+  const y0 = ground(z);
+  if (ty === 4) {   // городской автобус: белый с синей полосой
+    const L = 5.6; box(g, x - L, x + L, y0 + 0.45, y0 + 3.3, z - 1.25, z + 1.25, '#f2f2f2', { topCol: '#e4e8ee' });
+    onFront(g, x - L + 0.4, y0 + 1.9, 2 * L - 0.8, 1.0, z - 1.26, '#3a4a6a', 0.15); onFront(g, x - L, y0 + 1.15, 2 * L, 0.35, z - 1.27, '#1f5fae', 0);
+    for (let i = 1; i < 6; i++) onFront(g, x - L + 0.4 + i * (2 * L - 0.8) / 6 - 0.05, y0 + 1.9, 0.1, 1.0, z - 1.27, '#f2f2f2', 0);
+    wheels(g, [x - L * 0.7, x + L * 0.7], y0 + 0.45, z - 1.27); return; }
+  const L = ty === 2 ? 2.2 : 2.15, col = ty === 3 ? '#f2c230' : ty === 2 ? '#f4f4f4' : c;
+  box(g, x - L, x + L, y0 + 0.35, y0 + 1.15, z - 0.9, z + 0.9, col, { topCol: shade(col, 0.08) });
+  if (ty === 2) { const fx = dir * 0.5; box(g, x - L + 0.1 + Math.max(0, fx), x + L - 0.1 + Math.min(0, fx), y0 + 1.15, y0 + 2.35, z - 0.85, z + 0.85, col, { topCol: shade(col, 0.12) }); onFront(g, x - L + 0.5, y0 + 1.45, 2 * L - 1.0, 0.6, z - 0.86, '#3a4a6a', 0.15); }
+  else { const fx = dir > 0 ? 0.25 : -0.25, top = ty === 1 ? 2.05 : 1.8; box(g, x - 1.1 - fx, x + 1.0 - fx, y0 + 1.15, y0 + top, z - 0.8, z + 0.8, col, { topCol: shade(col, 0.12) }); onFront(g, x - 1.0 - fx, y0 + 1.2, 1.9, top - 1.3, z - 0.81, '#3a4a6a', 0.15);
+    if (ty === 3) { box(g, x - 0.35 - fx, x + 0.35 - fx, y0 + top, y0 + top + 0.35, z - 0.25, z + 0.25, '#ffffff'); onFront(g, x - 0.35 - fx, y0 + top + 0.05, 0.7, 0.25, z - 0.26, '#1e1e24', 0); } }
+  const hx = x + dir * (L - 0.05), p = proj(hx, y0 + 0.75, z - 0.6); if (p[2] > 1) { const s = cam.f / p[2]; g.fillStyle = dir > 0 ? '#fff4c0' : '#e83a3a'; g.beginPath(); g.arc(p[0], p[1], 0.2 * s, 0, 7); g.fill(); }
+  wheels(g, [x - L * 0.62, x + L * 0.62], y0 + 0.35, z - 0.92);
+}
+function carZ(g, x, z, dir, c, ty) {   // машина вдоль z: к нам — фары, от нас — красные стопы
+  const y0 = ground(z + 2), lc = dir < 0 ? '#fff4c0' : '#e83a3a';
+  if (ty === 4) { box(g, x - 1.25, x + 1.25, y0 + 0.45, y0 + 3.3, z, z + 11, '#f2f2f2', { topCol: '#e4e8ee' }); onFront(g, x - 1.05, y0 + 1.6, 2.1, 1.3, z, '#3a4a6a', 0.15); onFront(g, x - 1.25, y0 + 1.15, 2.5, 0.3, z - 0.01, '#1f5fae', 0); onFront(g, x - 1.1, y0 + 0.65, 0.4, 0.25, z - 0.01, lc, 0.2); onFront(g, x + 0.7, y0 + 0.65, 0.4, 0.25, z - 0.01, lc, 0.2); return; }
+  const col = ty === 3 ? '#f2c230' : ty === 2 ? '#f4f4f4' : c, L = 4.2, top = ty === 2 ? 2.35 : ty === 1 ? 2.05 : 1.8, c0 = ty === 2 ? 0.5 : 1.1, c1 = ty === 2 ? L - 0.1 : 3.1;
+  box(g, x - 0.95, x + 0.95, y0 + 0.35, y0 + 1.15, z, z + L, col, { topCol: shade(col, 0.08) }); box(g, x - 0.85, x + 0.85, y0 + 1.15, y0 + top, z + c0, z + c1, col, { topCol: shade(col, 0.12) });
+  if (ty === 3) box(g, x - 0.3, x + 0.3, y0 + top, y0 + top + 0.35, z + 1.8, z + 2.3, '#ffffff');
+  onFront(g, x - 0.75, y0 + 1.2, 1.5, top - 1.4, z + c0, '#3a4a6a', 0.15);
+  onFront(g, x - 0.8, y0 + 0.6, 0.35, 0.22, z, lc, 0.2); onFront(g, x + 0.45, y0 + 0.6, 0.35, 0.22, z, lc, 0.2);
+}
+const SHIRT = ['#e0503a', '#3a7bd5', '#f2c94c', '#27ae60', '#8e44ad', '#ffffff', '#e67e22', '#1abc9c', '#ec6fa0', '#34495e'];
+function walker(g, q, T) {
+  const b = proj(q.x, ground(q.z), q.z); if (b[2] < 2 || b[2] > 160) return; const kid = q.sd > 0.93, s = cam.f / b[2] * (kid ? 0.68 : 1), hh = 2.3 * s, hd = hh / 8, X = b[0], Y = b[1];
+  const ph = T * 7.5 + q.ph, sw = Math.sin(ph), side = Math.abs(q.dir) === 1, d = Math.sign(q.dir);
+  const col = SHIRT[Math.floor(q.sd * 977) % SHIRT.length], scarf = q.sd * 31 % 1 < 0.3, dop = !scarf && q.sd * 53 % 1 < 0.3;
+  g.lineCap = 'round'; g.lineJoin = 'round'; g.fillStyle = 'rgba(30,20,40,0.18)'; g.beginPath(); g.ellipse(X, Y, hd * 1.4, hd * 0.4, 0, 0, 7); g.fill();
+  const leg = (k) => { const dx = side ? sw * k * hd * 1.1 * d : hd * 0.4 * k, lift = side ? 0 : Math.max(0, sw * k) * hd * 0.5; g.strokeStyle = '#2f3550'; g.lineWidth = hd * 0.75; g.beginPath(); g.moveTo(X + (side ? 0 : hd * 0.4 * k), Y - hh * 0.5); g.lineTo(X + dx, Y - hd * 0.3 - lift); g.stroke(); };
+  leg(1); leg(-1);
+  if (scarf) { g.fillStyle = col; g.beginPath(); g.moveTo(X - hd * 0.95, Y - hh * 0.8); g.lineTo(X + hd * 0.95, Y - hh * 0.8); g.lineTo(X + hd * 1.15, Y - hh * 0.32); g.lineTo(X - hd * 1.15, Y - hh * 0.32); g.closePath(); g.fill(); }
+  else { g.fillStyle = col; g.beginPath(); g.moveTo(X - hd * 0.95, Y - hh * 0.8); g.lineTo(X + hd * 0.95, Y - hh * 0.8); g.lineTo(X + hd * 0.8, Y - hh * 0.47); g.lineTo(X - hd * 0.8, Y - hh * 0.47); g.closePath(); g.fill(); }
+  g.strokeStyle = '#f0c8a0'; g.lineWidth = hd * 0.42; for (const k of [1, -1]) { const ax = side ? -sw * k * hd * 0.8 * d : 0; g.beginPath(); g.moveTo(X + hd * 0.85 * k, Y - hh * 0.78); g.lineTo(X + hd * 0.95 * k + ax, Y - hh * 0.5); g.stroke(); }
+  g.fillStyle = '#f0c8a0'; g.beginPath(); g.arc(X, Y - hh + hd * 0.5, hd * 0.52, 0, 7); g.fill();
+  if (scarf) { g.fillStyle = ['#ffffff', '#e05a7a', '#3a7bd5', '#f2c94c'][Math.floor(q.sd * 401) % 4]; g.beginPath(); g.arc(X, Y - hh + hd * 0.45, hd * 0.68, Math.PI * 0.95, Math.PI * 2.05); g.lineTo(X + hd * 0.6, Y - hh + hd * 1.15); g.lineTo(X - hd * 0.6, Y - hh + hd * 1.15); g.closePath(); g.fill(); }
+  else { g.fillStyle = ['#2a1c18', '#4a3020', '#1a1418'][Math.floor(q.sd * 211) % 3]; g.beginPath(); g.arc(X, Y - hh + hd * 0.38, hd * 0.55, Math.PI, 0); g.fill();
+    if (dop) { g.fillStyle = '#1a1a22'; g.fillRect(X - hd * 0.55, Y - hh - hd * 0.15, hd * 1.1, hd * 0.5); g.strokeStyle = '#f0f0f0'; g.lineWidth = Math.max(1, hd * 0.08); g.beginPath(); g.moveTo(X - hd * 0.3, Y - hh + hd * 0.05); g.lineTo(X - hd * 0.1, Y - hh - hd * 0.1); g.moveTo(X + hd * 0.1, Y - hh + hd * 0.05); g.lineTo(X + hd * 0.3, Y - hh - hd * 0.1); g.stroke(); } }
+}
+export function mover(g, q, T) { if ((q.a ?? 1) < 0.02) return; const ga = g.globalAlpha; g.globalAlpha = ga * (q.a ?? 1); moverIn(g, q, T); g.globalAlpha = ga; }
+function moverIn(g, q, T) { if (q.k === 'cx') carX(g, q.x, q.z, q.dir, q.c, q.ty); else if (q.k === 'cz') carZ(g, q.x, q.z, q.dir, q.c, q.ty); else walker(g, q, T); }
+// таблички на перекрёстках: синие, как в Ташкенте
+export function signs(R = 150) {
+  const out = [], jz = Math.round(cam.z / 32), bx = Math.round((cam.x + 5) / 138);
+  for (let j = jz - 2; j <= jz + 6; j++) for (let b = bx - 2; b <= bx + 2; b++) { const x = -5 + b * 138, z = j * 32; if (x < -560 || x > 560 || z < -540 || z > 500) continue; for (const sx of [x - 1.0, x + 11.0]) if (!inPlaza(sx, z - 1) && Math.hypot(sx - TEMUR.x, z - 1 - TEMUR.z) > TEMUR.r + 2) out.push({ x: sx, z: z - 1.0, h: rowName(j, sx), v: colName(b), metro: ((j % 5) + 5) % 5 === 0 && b % 2 === 0 && sx > x }); }
+  return out;
+}
+export function streetSign(g, q) {
+  const y0 = ground(q.z), a = proj(q.x, y0, q.z); if (a[2] < 3 || a[2] > 150) return; const s = cam.f / a[2], top = proj(q.x, y0 + 4.2, q.z);
+  g.strokeStyle = '#3a3e48'; g.lineWidth = Math.max(1.2, 0.14 * s); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(top[0], top[1]); g.stroke();
+  const fs = Math.max(7, 0.42 * s); g.font = `800 ${fs}px Rubik`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  if (q.metro) { const m = proj(q.x + 1.6, y0 + 3.6, q.z), mt = proj(q.x + 1.6, y0, q.z), r = 0.75 * cam.f / m[2]; g.strokeStyle = '#3a3e48'; g.lineWidth = Math.max(1.2, 0.14 * s); g.beginPath(); g.moveTo(mt[0], mt[1]); g.lineTo(m[0], m[1]); g.stroke();
+    g.fillStyle = '#1f5fae'; g.strokeStyle = '#ffffff'; g.lineWidth = Math.max(1, r * 0.12); g.beginPath(); g.arc(m[0], m[1] - r, r, 0, 7); g.fill(); g.stroke(); g.font = `900 ${r * 1.3}px Rubik`; g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('M', m[0], m[1] - r * 0.92); g.font = `800 ${fs}px Rubik`; }
+  [[q.h, 0], [q.v, 1]].forEach(([t, i]) => { const w = g.measureText(t).width + fs * 1.0, hgt = fs * 1.55, cy = top[1] + i * (hgt + fs * 0.25) + hgt / 2;
+    g.fillStyle = '#1f5fae'; g.strokeStyle = '#ffffff'; g.lineWidth = Math.max(1, fs * 0.12); g.beginPath(); g.roundRect(top[0] - w / 2, cy - hgt / 2, w, hgt, fs * 0.25); g.fill(); g.stroke(); g.fillStyle = '#ffffff'; g.fillText(t, top[0], cy + fs * 0.05); });
+}
+
+// ---------- ташкентские детали: чинары вдоль арыков, автобусные остановки ----------
+(() => { let n = 50000; for (let j = -17; j <= 15; j++) { const z = j * 32; for (let b = -4; b <= 3; b++) { const x0 = -5 + b * 138 + 10;
+  for (let k = 0; k <= 8; k++) { const x = x0 + k * 16; if (Math.abs(x) < 40 && z > -100 && z < -10) continue; if (H01(x * 0.71 + j * 1.3) < 0.18) continue; PROPS.push({ kind: 'chinar', x, z: z + 9.9, seed: n++, s: 0.85 + H01(x + j) * 0.35 }); }
+  if (((j % 2) + 2) % 2 === 0 && !(Math.abs(x0 + 64) < 40 && z > -100 && z < -10)) PROPS.push({ kind: 'stop', x: x0 + 64, z: z + 9.3, seed: n++ }); } } })();
+function chinar(g, x, z, sc, T, seed) {   // чинара: светлый пятнистый ствол, широкая пышная крона
+  const y0 = ground(z), b = proj(x, y0, z); if (b[2] < 2 || b[2] > 420) return; const s = cam.f / b[2] * sc, fz = fog(b[2]);
+  if (b[2] < 140) { g.fillStyle = 'rgba(30,40,20,0.18)'; g.beginPath(); g.ellipse(b[0], b[1], 2.6 * s, 0.7 * s, 0, 0, 7); g.fill(); }
+  g.fillStyle = mix('#cdbfa4', HAZE, fz); g.beginPath(); g.moveTo(b[0] - 0.35 * s, b[1]); g.lineTo(b[0] - 0.22 * s, b[1] - 5 * s); g.lineTo(b[0] + 0.22 * s, b[1] - 5 * s); g.lineTo(b[0] + 0.35 * s, b[1]); g.closePath(); g.fill();
+  if (b[2] < 120) { g.fillStyle = mix('#8a7a60', HAZE, fz); for (let i = 0; i < 4; i++) { g.beginPath(); g.ellipse(b[0] + (H01(seed + i) - 0.5) * 0.4 * s, b[1] - (0.8 + i * 1.1) * s, 0.12 * s, 0.22 * s, 0, 0, 7); g.fill(); } }
+  const sw = Math.sin(T * 1.1 + seed) * 0.12 * s;
+  for (const [dx, dy, r, c] of [[-1.7, -5.6, 2.2, '#3d6a2e'], [1.7, -5.8, 2.2, '#3d6a2e'], [0, -7.4, 2.6, '#4a7c34'], [-1.0, -6.4, 2.0, '#558a3a'], [1.1, -7.0, 1.9, '#5e9640'], [0.2, -8.6, 1.7, '#6aa446']]) { g.fillStyle = mix(c, HAZE, fz); g.beginPath(); g.arc(b[0] + dx * s + sw * (-dy / 8), b[1] + dy * s, r * s, 0, 7); g.fill(); }
+  g.fillStyle = mix('#9ccc62', HAZE, fz); g.globalAlpha *= 0.5; g.beginPath(); g.arc(b[0] + 0.9 * s + sw, b[1] - 8.2 * s, 0.9 * s, 0, 7); g.fill(); g.globalAlpha /= 0.5;
+}
+function busStop(g, x, z) {   // остановка «Bekat»: навес, скамейка, синяя табличка
+  const y0 = ground(z), a = proj(x, y0, z); if (a[2] < 3 || a[2] > 200) return;
+  for (const px of [x - 1.6, x + 1.6]) { const p0 = proj(px, y0, z + 0.4), p1 = proj(px, y0 + 2.5, z + 0.4); g.strokeStyle = '#4a4e58'; g.lineWidth = Math.max(1, 0.12 * cam.f / a[2]); g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.stroke(); }
+  face(g, [[x - 1.7, y0 + 0.2, z + 0.7], [x + 1.7, y0 + 0.2, z + 0.7], [x + 1.7, y0 + 2.4, z + 0.7], [x - 1.7, y0 + 2.4, z + 0.7]], '#9fc4dc', 0.1, { lw: 1 });
+  box(g, x - 1.2, x + 1.2, y0 + 0.5, y0 + 0.65, z + 0.2, z + 0.6, '#8a5a3a');
+  box(g, x - 1.9, x + 1.9, y0 + 2.5, y0 + 2.7, z - 0.2, z + 0.9, '#1f5fae', { topCol: '#2e74c8' });
+  const t = proj(x, y0 + 2.6, z - 0.21); if (t[2] > 1 && t[2] < 90) { const fs = Math.max(6, 0.35 * cam.f / t[2]); g.font = `800 ${fs}px Rubik`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffffff'; g.fillText('BEKAT', t[0], t[1]); }
+}
+export function propX(g, q, T) { if (q.kind === 'chinar') return chinar(g, q.x, q.z, q.s, T, q.seed); if (q.kind === 'stop') return busStop(g, q.x, q.z); prop(g, q, T); }
+// арыки вдоль тротуаров — только рядом с камерой
+export function aryks(g, T) {
+  const jz = Math.round(cam.z / 32); for (let j = jz - 2; j <= jz + 6; j++) { const z = j * 32 + 9.55; if (z < -540 || z > 500) continue; const xa = Math.max(-560, cam.x - 140), xb = Math.min(560, cam.x + 140);
+    for (let b = Math.floor((xa + 5) / 138); b <= Math.ceil((xb + 5) / 138); b++) { const x0 = Math.max(xa, -5 + b * 138 + 10), x1 = Math.min(xb, -5 + (b + 1) * 138); if (x1 <= x0) continue; if (z > -100 && z < -10 && x0 < 40 && x1 > -40) continue;
+      groundQuad(g, x0, x1, z - 0.05, z + 0.45, '#4a5a5a', 0); groundQuad(g, x0, x1, z + 0.02, z + 0.38, '#5aa7c8', 0.15); } }
+}
+// ---------- сквер Амира Темура: круглая площадь, кольцо, памятник-всадник ----------
+function disk(g, cx, cz, r, col, line, n = 40) { const pts = []; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r; pts.push([x, ground(z) + 0.03, z]); } let pr = P(pts); if (pr.every((p) => p[2] < NEAR)) return; if (pr.some((p) => p[2] < NEAR)) { pr = clipNear(pr); if (!pr) return; } poly(g, pr, mix(col, HAZE_FAR, fog(avgZ(pr))), line, 1.5); }
+export function temurGround(g) {
+  const { x, z, r } = TEMUR; if (Math.abs(z - cam.z) > 700) return;
+  disk(g, x, z, r + 1.2, '#9a8e88'); disk(g, x, z, r, '#5a5058'); disk(g, x, z, r - 4.2, '#9a8e88'); disk(g, x, z, r - 5, '#5f9a40');
+  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4, c = Math.cos(a), sn = Math.sin(a); const pts = [[x + c * 1.6 - sn * 0.6, z + sn * 1.6 + c * 0.6], [x + c * (r - 5) - sn * 0.6, z + sn * (r - 5) + c * 0.6], [x + c * (r - 5) + sn * 0.6, z + sn * (r - 5) - c * 0.6], [x + c * 1.6 + sn * 0.6, z + sn * 1.6 - c * 0.6]].map(([px, pz]) => [px, ground(pz) + 0.05, pz]); const pr = P(pts); if (pr.every((p) => p[2] > NEAR)) poly(g, pr, '#d8ccb0'); }
+  disk(g, x, z, 2.2, '#d8ccb0'); disk(g, x, z, 3.0, 'rgba(0,0,0,0)', null);
+}
+export function temurMonument(g, T) {
+  const { x, z } = TEMUR, y0 = ground(z), b = proj(x, y0, z); if (b[2] < 2 || b[2] > 700) return;
+  const TR = []; for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + 0.3; TR.push([x + Math.cos(a) * 7.3, z + Math.sin(a) * 7.3, i]); } const cd = (q) => Math.hypot(q[0] - cam.x, q[1] - cam.z), md = Math.hypot(x - cam.x, z - cam.z);
+  TR.filter((q) => cd(q) > md).sort((a, b) => cd(b) - cd(a)).forEach((q) => chinar(g, q[0], q[1], 0.48, T, 900 + q[2]));
+  box(g, x - 1.5, x + 1.5, y0, y0 + 0.5, z - 1.5, z + 1.5, '#8a8078'); box(g, x - 1.1, x + 1.1, y0 + 0.5, y0 + 3.6, z - 1.1, z + 1.1, '#6a6070', { topCol: '#7a7080' });
+  const p = proj(x, y0 + 3.6, z), s = cam.f / p[2], X = p[0], Y = p[1], br = mix('#6b5530', HAZE_FAR, fog(p[2])), hi = mix('#9a8048', HAZE_FAR, fog(p[2]));
+  g.fillStyle = br; g.strokeStyle = br; g.lineCap = 'round';
+  g.beginPath(); g.ellipse(X, Y - 1.7 * s, 1.5 * s, 0.75 * s, -0.05, 0, 7); g.fill();   // корпус коня
+  g.lineWidth = 0.32 * s; for (const [lx, k] of [[-1.0, 0], [-0.6, 0.3], [0.8, -0.5], [1.15, 0]]) { g.beginPath(); g.moveTo(X + lx * s, Y - 1.4 * s); g.lineTo(X + (lx + k) * s, Y - (k < 0 ? 0.6 : 0) * s - 0.05 * s); if (k < 0) g.lineTo(X + (lx + k - 0.2) * s, Y - 0.25 * s); g.stroke(); }   // ноги, одна поднята
+  g.lineWidth = 0.55 * s; g.beginPath(); g.moveTo(X + 1.2 * s, Y - 2.0 * s); g.lineTo(X + 1.75 * s, Y - 2.9 * s); g.stroke(); g.beginPath(); g.ellipse(X + 2.0 * s, Y - 3.0 * s, 0.5 * s, 0.25 * s, 0.4, 0, 7); g.fill();   // шея и голова
+  g.lineWidth = 0.18 * s; g.beginPath(); g.moveTo(X - 1.45 * s, Y - 1.8 * s); g.quadraticCurveTo(X - 2.1 * s, Y - 1.3 * s, X - 1.9 * s, Y - 0.6 * s); g.stroke();   // хвост
+  g.beginPath(); g.moveTo(X - 0.4 * s, Y - 2.3 * s); g.lineTo(X - 0.1 * s, Y - 3.6 * s); g.lineTo(X + 0.4 * s, Y - 3.6 * s); g.lineTo(X + 0.45 * s, Y - 2.3 * s); g.closePath(); g.fill();   // всадник
+  g.lineWidth = 0.22 * s; g.beginPath(); g.moveTo(X + 0.3 * s, Y - 3.4 * s); g.lineTo(X + 1.1 * s, Y - 3.9 * s); g.stroke();   // вытянутая рука
+  g.beginPath(); g.arc(X + 0.15 * s, Y - 3.95 * s, 0.32 * s, 0, 7); g.fill(); g.fillStyle = hi; g.beginPath(); g.arc(X + 0.15 * s, Y - 4.2 * s, 0.3 * s, Math.PI, 0); g.fill();   // голова в шлеме
+  TR.filter((q) => cd(q) <= md).sort((a, b) => cd(b) - cd(a)).forEach((q) => chinar(g, q[0], q[1], 0.48, T, 900 + q[2]));
+  const t = proj(x, y0 + 9.5, z); if (t[2] < 260) { const fs = clamp(0.8 * cam.f / t[2], 9, 30); g.font = `900 ${fs}px Rubik`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = fs / 5; g.strokeStyle = 'rgba(30,22,40,0.85)'; g.strokeText('Amir Temur xiyoboni', t[0], t[1]); g.fillStyle = '#fff3dc'; g.fillText('Amir Temur xiyoboni', t[0], t[1]); }
+}
+// ---------- горизонт: Ташкентская телебашня и высотки Tashkent City ----------
+export function tashkentSkyline(g, T) {
+  const fz = 0.55; const tw = [[150, 680, 46, 9], [168, 690, 64, 10], [190, 675, 52, 8], [210, 700, 80, 11], [232, 685, 58, 9], [118, 700, 38, 10], [255, 695, 44, 8]];
+  for (const [x, z, h, w] of tw) { const a = proj(x - w / 2, ground(z), z), b2 = proj(x + w / 2, ground(z) + h, z); if (a[2] < 1) continue; g.fillStyle = mix('#7a9ac0', HAZE_FAR, fz); g.fillRect(a[0], b2[1], b2[0] - a[0], a[1] - b2[1]); g.fillStyle = mix('#b8d0ea', HAZE_FAR, fz); g.fillRect(a[0], b2[1], (b2[0] - a[0]) * 0.3, a[1] - b2[1]);
+    g.fillStyle = mix('#5a7aa0', HAZE_FAR, fz); for (let k = 1; k < h / 6; k++) { const yy = lerp(a[1], b2[1], k / (h / 6)); g.fillRect(a[0], yy, b2[0] - a[0], 1); } }
+  // телебашня: три расставленные опоры, ствол, две «тарелки», шпиль
+  const X = -60, Z = 600, y0 = ground(Z), H = 92, p0 = proj(X, y0, Z); if (p0[2] < 1) return; const P2 = (dx, y) => proj(X + dx, y0 + y, Z);
+  const col = mix('#e8ecf2', HAZE_FAR, 0.35), dk = mix('#9aa4b4', HAZE_FAR, 0.35); g.strokeStyle = col; g.lineCap = 'round';
+  const top = P2(0, H); g.lineWidth = 2.5; for (const dx of [-9, 0, 9]) { const a = P2(dx, 0), c = P2(dx * 0.15, 22); g.beginPath(); g.moveTo(a[0], a[1]); g.quadraticCurveTo(P2(dx * 0.55, 6)[0], P2(dx * 0.55, 6)[1], c[0], c[1]); g.stroke(); }
+  const s0 = P2(0, 22); g.lineWidth = 4; g.beginPath(); g.moveTo(s0[0], s0[1]); g.lineTo(top[0], top[1]); g.stroke();
+  g.strokeStyle = dk; g.lineWidth = 1; for (let i = 0; i < 9; i++) { const a = P2(-1.6 + i * 0.05, 22 + i * 6), c = P2(1.6 - i * 0.05, 25 + i * 6); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); g.stroke(); }
+  for (const [y, w, hh] of [[58, 5, 2.2], [66, 3.2, 1.6]]) { const c = P2(0, y), r = P2(w, y); g.fillStyle = col; g.beginPath(); g.ellipse(c[0], c[1], r[0] - c[0], (r[0] - c[0]) * 0.4, 0, 0, 7); g.fill(); g.fillStyle = dk; g.fillRect(c[0] - (r[0] - c[0]), c[1], 2 * (r[0] - c[0]), hh); }
+  const sp = P2(0, H + 14); g.strokeStyle = '#d04040'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(top[0], top[1]); g.lineTo(sp[0], sp[1]); g.stroke();
+  if (Math.floor(T * 1.6) % 2) { g.fillStyle = 'rgba(255,80,80,0.35)'; g.beginPath(); g.arc(sp[0], sp[1], 12, 0, 7); g.fill(); g.fillStyle = '#ff6a6a'; g.beginPath(); g.arc(sp[0], sp[1], 3, 0, 7); g.fill(); }
+}
+
+// ---------- панельные пятиэтажки (Юнусабад на севере, Чиланзор за Анхором), Чорсу, Анхор, ворота махалли ----------
+export const CHORSU = { x: -43, z: -43, r: 8.5 };
+export const ANHOR = { x0: -577, x1: -569 };
+export const BLOCKS = [];
+(() => { const PC = ['#e8dcc0', '#eef0ee', '#d6e4ec', '#ecd6c8', '#e4e0cc'], add = (x, z, w, i) => BLOCKS.push({ x, z, w, d: 11, h: 5, col: PC[i % PC.length], seed: i, kind: 'panel' }); let i = 0;
+  for (let j = 18; j <= 20; j++) for (let b = -3; b <= 2; b++) { const x0 = -5 + b * 138 + 10, z = j * 32 + 12; add(x0 + 30, z, 44, i++); add(x0 + 96, z, 44, i++); }
+  for (let j = -14; j <= -2; j += 2) { const z = j * 32 + 12; add(-658, z, 40, i++); add(-612, z, 38, i++); } })();
+function panelBlock(g, B, T, lit) {
+  const { x, z, w, d, col, seed } = B, y0 = ground(z), fh = 2.9, H = fh * B.h + 0.6, x0 = x - w / 2, x1 = x + w / 2, c = proj(x, y0 + H / 2, z); if (c[2] < 2 || c[2] > 900) return;
+  box(g, x0, x1, y0, y0 + H, z, z + d, col, { topCol: shade(col, -0.25) });
+  box(g, x0 - 0.2, x1 + 0.2, y0 + H, y0 + H + 0.35, z - 0.2, z + d + 0.2, shade(col, -0.35));
+  if (c[2] > 420) { for (let f = 1; f < B.h; f++) onFront(g, x0, y0 + f * fh, w, 0.12, z - 0.01, shade(col, -0.15), 0); return; }
+  const nw = Math.round(w / 3.3), cw = w / nw;
+  for (let f = 0; f < B.h; f++) for (let k = 0; k < nw; k++) { const wx = x0 + k * cw, wy = y0 + 0.6 + f * fh, on = lit > 0.3 && H01(seed * 31 + f * 7 + k) < 0.55;
+    onFront(g, wx + cw * 0.2, wy + 0.8, cw * 0.6, 1.3, z - 0.02, on ? '#ffd890' : '#4a5a74', on ? 0.1 : 0.12);
+    if (f > 0 && k % 2 === 1 && H01(seed + f * 3 + k * 5) < 0.75) { const bc = H01(seed * 5 + f + k) < 0.4 ? '#cfe4f0' : shade(col, -0.08); box(g, wx + cw * 0.05, wx + cw * 0.95, wy + 0.2, wy + 1.15, z - 1.0, z, bc, { topCol: shade(bc, 0.1) });
+      if (H01(seed + k + f * 9) < 0.3) { const q = proj(wx + cw * 0.3, wy + 1.0, z - 1.02); if (q[2] > 1 && q[2] < 160) { const s = cam.f / q[2]; g.fillStyle = ['#e05a5a', '#5aa0e0', '#f0d060', '#ffffff'][(seed + k + f) % 4]; g.fillRect(q[0], q[1] - 0.15 * s, 0.6 * s, 0.4 * s); } } }
+    if (f > 0 && k % 3 === 0 && H01(seed * 9 + f + k) < 0.3) box(g, wx + cw * 0.75, wx + cw * 0.95, wy + 1.6, wy + 2.0, z - 0.35, z, '#f4f4f4'); }   // кондиционеры
+  for (let e = 0; e < 3; e++) { const ex = x0 + w * (e + 0.5) / 3; onFront(g, ex - 0.8, y0, 1.6, 2.1, z - 0.03, '#5a4038', 0); box(g, ex - 1.2, ex + 1.2, y0 + 2.2, y0 + 2.4, z - 1.0, z, shade(col, -0.3)); }
+  const dish = proj(x1 - 2, y0 + H + 0.35, z + 2); if (dish[2] < 200) { const s = cam.f / dish[2]; g.fillStyle = '#d8d8d8'; g.beginPath(); g.ellipse(dish[0], dish[1] - 0.6 * s, 0.6 * s, 0.45 * s, -0.4, 0, 7); g.fill(); }
+}
+function chorsu(g, T) {
+  const { x, z, r } = CHORSU, y0 = ground(z), c = proj(x, y0, z); if (c[2] < 3 || c[2] > 900) return;
+  box(g, x - r - 2, x + r + 2, y0, y0 + 0.4, z - r - 2, z + r + 2, '#c8b89a');
+  for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + (i - 2.5) * 0.42, sx = x + Math.cos(a) * (r + 0.6), sz = z + Math.sin(a) * (r + 0.6) + 1, p = proj(sx, y0 + 4.3, sz), q = proj(sx, y0 + 0.4, sz); if (p[2] < 1) continue; const s = cam.f / p[2];   // малые купола-лавки по кругу
+    g.fillStyle = mix('#d8c8a8', HAZE_FAR, fog(p[2])); g.fillRect(p[0] - 1.6 * s, p[1], 3.2 * s, q[1] - p[1]); g.fillStyle = mix('#2a8fb0', HAZE_FAR, fog(p[2])); g.beginPath(); g.ellipse(p[0], p[1], 1.6 * s, 1.3 * s, 0, Math.PI, 0); g.fill();
+    g.fillStyle = mix('#4a3a30', HAZE_FAR, fog(p[2])); g.beginPath(); g.ellipse(p[0], q[1] - 1.2 * s, 0.7 * s, 1.2 * s, 0, Math.PI, 0); g.fill(); }
+  const base = proj(x, y0 + 0.4, z - r * 0.15), top = proj(x, y0 + 6, z - r * 0.15), s = cam.f / base[2], R = r * s, f = fog(base[2]);
+  g.fillStyle = mix('#e6d8b8', HAZE_FAR, f); g.fillRect(base[0] - R, top[1], 2 * R, base[1] - top[1]);   // барабан
+  g.fillStyle = mix('#3a2e2a', HAZE_FAR, f); for (let k = 0; k < 7; k++) { const ax = base[0] - R + (k + 0.5) * 2 * R / 7; g.beginPath(); g.moveTo(ax - R * 0.08, base[1]); g.lineTo(ax - R * 0.08, base[1] - (base[1] - top[1]) * 0.55); g.quadraticCurveTo(ax, base[1] - (base[1] - top[1]) * 0.8, ax + R * 0.08, base[1] - (base[1] - top[1]) * 0.55); g.lineTo(ax + R * 0.08, base[1]); g.closePath(); g.fill(); }
+  g.fillStyle = mix('#2a6fa8', HAZE_FAR, f); g.fillRect(base[0] - R, top[1] - 0.25 * s, 2 * R, 0.5 * s);
+  const dh = R * 0.95; g.fillStyle = mix('#1f86b8', HAZE_FAR, f); g.beginPath(); g.ellipse(top[0], top[1], R * 0.98, dh, 0, Math.PI, 0); g.fill();   // большой голубой купол
+  g.save(); g.beginPath(); g.ellipse(top[0], top[1], R * 0.98, dh, 0, Math.PI, 0); g.clip(); g.strokeStyle = mix('#7fd0ec', HAZE_FAR, f); g.lineWidth = Math.max(1, 0.12 * s);
+  for (let k = 1; k < 5; k++) { g.beginPath(); g.ellipse(top[0], top[1], R * 0.98, dh * k / 5, 0, Math.PI, 0); g.stroke(); } for (let k = -4; k <= 4; k++) { g.beginPath(); g.ellipse(top[0], top[1], Math.abs(R * 0.98 * k / 4.5), dh, 0, Math.PI, 0); g.stroke(); }
+  g.fillStyle = 'rgba(255,255,255,0.18)'; g.beginPath(); g.ellipse(top[0] - R * 0.35, top[1] - dh * 0.55, R * 0.25, dh * 0.3, -0.5, 0, 7); g.fill(); g.restore();
+  g.fillStyle = mix('#e6d8b8', HAZE_FAR, f); g.beginPath(); g.ellipse(top[0], top[1] - dh, R * 0.12, R * 0.06, 0, 0, 7); g.fill();
+  const t = proj(x, y0 + 6 + r + 2.5, z); if (t[2] < 320) { const fs = clamp(0.8 * cam.f / t[2], 9, 30); g.font = `900 ${fs}px Rubik`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = fs / 5; g.strokeStyle = 'rgba(30,22,40,0.85)'; g.strokeText('Chorsu bozori', t[0], t[1]); g.fillStyle = '#fff3dc'; g.fillText('Chorsu bozori', t[0], t[1]); }
+}
+// канал Анхор с мостиками на перекрёстках
+export function anhor(g, T) {
+  if (Math.abs(cam.x - ANHOR.x0) > 900) return; const za = Math.max(-560, cam.z - 40), zb = Math.min(560, cam.z + 760);
+  for (let j = Math.floor(za / 32); j <= Math.ceil(zb / 32); j++) { const z0 = j * 32 + 10, z1 = j * 32 + 32; if (z1 < za || z0 > zb) continue;
+    if (z0 > 60 && z1 < 220) continue;   // в озеро
+    groundQuad(g, ANHOR.x0 - 1.2, ANHOR.x1 + 1.2, z0, z1, '#b4a890', 0); groundQuad(g, ANHOR.x0, ANHOR.x1, z0, z1, '#3f8fb4', 0.1);
+    if (Math.abs(z0 - cam.z) < 200) for (let k = 0; k < 3; k++) { const zz = z0 + 3 + ((k * 7 + T * 2.5) % 19), a = proj(ANHOR.x0 + 2 + k * 1.5, ground(zz) + 0.06, zz), b = proj(ANHOR.x0 + 3 + k * 1.5, ground(zz + 1) + 0.06, zz + 1); if (a[2] > 1) { g.strokeStyle = 'rgba(220,240,255,0.5)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); } }
+    for (const rz of [j * 32 + 0.2, j * 32 + 9.8]) { const a = proj(ANHOR.x0 - 1, ground(rz) + 1, rz), b = proj(ANHOR.x1 + 1, ground(rz) + 1, rz), a0 = proj(ANHOR.x0 - 1, ground(rz), rz), b0 = proj(ANHOR.x1 + 1, ground(rz), rz); if (a[2] < 2 || a[2] > 300) continue; g.strokeStyle = '#e8e0d0'; g.lineWidth = Math.max(1, 0.15 * cam.f / a[2]); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.moveTo(a0[0], a0[1]); g.lineTo(a[0], a[1]); g.moveTo(b0[0], b0[1]); g.lineTo(b[0], b[1]); g.stroke(); } }
+  const t = proj((ANHOR.x0 + ANHOR.x1) / 2, ground(cam.z + 90) + 2, cam.z + 90); if (t[2] > 5 && t[2] < 300) { const fs = clamp(0.9 * cam.f / t[2], 10, 26); g.font = `900 ${fs}px Rubik`; g.textAlign = 'center'; g.lineWidth = fs / 5; g.strokeStyle = 'rgba(30,22,40,0.8)'; g.strokeText('Anhor', t[0], t[1]); g.fillStyle = '#cfefff'; g.fillText('Anhor', t[0], t[1]); }
+}
+// ворота махалли над поперечными улицами
+export function gates() {
+  const out = [], jz = Math.round(cam.z / 32), bx = Math.round((cam.x + 5) / 138);
+  for (let j = jz - 1; j <= jz + 8; j++) for (let b = bx - 2; b <= bx + 2; b++) { if (b === 0 || ((j * 7 + b * 3) % 3 + 3) % 3 !== 0) continue; const x = -5 + b * 138, z = j * 32 + 21; if (x < -560 || x > 560 || z < -500 || z > 470) continue;
+    const nm = rowName(j, x + 20).replace(' koʻchasi', '') + ' mahallasi'; out.push({ x: x + 5, z, nm }); }
+  return out;
+}
+export function gate(g, q) {
+  const { x, z } = q, y0 = ground(z), c = proj(x, y0, z); if (c[2] < 3 || c[2] > 260) return; const H = 6.2;
+  for (const px of [x - 5.6, x + 5.6]) { box(g, px - 0.5, px + 0.5, y0, y0 + H, z - 0.5, z + 0.5, '#e8dcc4'); for (let k = 0; k < 3; k++) onFront(g, px - 0.4, y0 + 1 + k * 1.6, 0.8, 0.9, z - 0.51, '#2a7ab8', 0.1); box(g, px - 0.65, px + 0.65, y0 + H, y0 + H + 0.5, z - 0.65, z + 0.65, '#2a7ab8'); }
+  box(g, x - 6.2, x + 6.2, y0 + H - 1.4, y0 + H - 0.1, z - 0.4, z + 0.4, '#2a7ab8', { topCol: '#3a8ac8' });
+  for (let k = 0; k < 12; k++) onFront(g, x - 5.9 + k, y0 + H - 1.25, 0.5, 0.25, z - 0.41, k % 2 ? '#f2c94c' : '#ffffff', 0);
+  const t = proj(x, y0 + H - 0.65, z - 0.42); if (t[2] < 160) { const fs = clamp(0.55 * cam.f / t[2], 6, 30); g.font = `900 ${fs}px Rubik`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffffff'; g.fillText(q.nm, t[0], t[1] + fs * 0.35); }
+}
+export function landmark(g, q, T, lit) { if (q.kind === 'panel') panelBlock(g, q, T, lit); else if (q.kind === 'chorsu') chorsu(g, T); else if (q.kind === 'gate') gate(g, q); }

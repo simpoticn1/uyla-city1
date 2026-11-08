@@ -1,9 +1,10 @@
 // UYLA CITY — найди свой дом. Тот же мир и тот же код, что в рилсах.
 import { E, clamp, lerp, ease } from './core.js';
-import { mix, PROPS, prop, setOCC, lotGround, mosque, setHaze, VOTE as _V, cam, setCam, proj, ground, sky, horizon, terrain, scatter, props, house, plots, ENV, drawLights, setLOD, addLight, extras, lake, DACHAS, LAKE, plaza, VOTE } from './world.js';
+import { mix, PROPS, prop, setOCC, lotGround, mosque, setHaze, VOTE as _V, cam, setCam, proj, ground, sky, horizon, terrain, scatter, props, house, plots, ENV, drawLights, setLOD, addLight, extras, lake, DACHAS, LAKE, plaza, VOTE, addresses, movers, mover, signs, streetSign, rowOf, propX, aryks, temurGround, temurMonument, TEMUR, DISTRICTS, BLOCKS, CHORSU, anhor, gates, landmark } from './world.js';
 import { CITY } from './citydata.js';
+import { drawRoom, roomItems } from './room.js';
 
-const HOUSES = CITY.houses; const BY = new Map(HOUSES.map((h) => [h.nickname.toLowerCase(), h]));
+const HOUSES = CITY.houses; addresses(HOUSES); const DCENT = DISTRICTS.map((n) => { const L = HOUSES.filter((h) => h.dist === n); return L.length ? [n, L.reduce((a, h) => a + h.x, 0) / L.length, L.reduce((a, h) => a + h.z, 0) / L.length] : null; }).filter(Boolean); const BY = new Map(HOUSES.map((h) => [h.nickname.toLowerCase(), h]));
 // свободные участки v3: рамки для «тебя пока нет»
 CITY.free.forEach((f, i) => plots.push({ x: f.x, z: f.z, street: f.street, i, j: f.street, taken: false }));
 const GHOST = plots[0] || null;
@@ -61,34 +62,43 @@ function drawWorld(G, T, opt = {}) {
   const cw = G.canvas.width, ch = G.canvas.height; for (const c of [WL, WM]) if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; }
   let g = WL.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cw, ch); g.setTransform(G.getTransform()); safe(g);
   G.save(); sky(G, T); const hz = horizon(G, T); G.restore();
-  terrain(g, T, {}); lake(g, T); if (opt.plaza !== false) plaza(g, T, [1, 1, 1, 1, 1]);
+  terrain(g, T, {}); aryks(g, T); anhor(g, T); temurGround(g); lake(g, T); if (opt.plaza !== false) plaza(g, T, [1, 1, 1, 1, 1]);
   const vis = []; for (const h of HOUSES) { const c = proj(h.x, ground(h.z) + 3, h.z + 3); if (c[2] < 2 || c[2] > 1300 || c[0] < -200 || c[0] > E.W + 200 || c[1] < -400 || c[1] > E.H + 300) continue; vis.push([h, c[2]]); }
   for (const d of DACHAS) { const c = proj(d.x, ground(d.z) + 3, d.z + 3); if (c[2] > 2 && c[2] < 600) vis.push([d, c[2], 'd']); }
   for (const q of PROPS) { const c = proj(q.x, ground(q.z), q.z); if (c[2] > 1 && c[2] < 600) vis.push([q, c[2], 'p']); }
+  if (opt.life !== false) { for (const q of movers(T)) { const c = proj(q.x, ground(q.z) + 0.8, q.z); if (c[2] > 2 && c[2] < 380 && c[0] > -150 && c[0] < E.W + 150) vis.push([q, c[2], 't']); } for (const q of signs()) { const c = proj(q.x, ground(q.z), q.z); if (c[2] > 3 && c[2] < 150) vis.push([q, c[2], 's']); } }
+  { const c = proj(TEMUR.x, ground(TEMUR.z) + 3, TEMUR.z); if (c[2] > 2) vis.push([null, c[2], 'tm']); }
+  { const c = proj(CHORSU.x, ground(CHORSU.z) + 3, CHORSU.z + 2); if (c[2] > 2) vis.push([{ kind: 'chorsu' }, c[2], 'lm']); }
+  for (const B of BLOCKS) { const c = proj(B.x, ground(B.z) + 7, B.z + 4); if (c[2] > 2 && c[2] < 900 && c[0] > -600 && c[0] < E.W + 600) vis.push([B, c[2], 'lm']); }
+  for (const q of gates()) { const c = proj(q.x, ground(q.z) + 3, q.z); if (c[2] > 3 && c[2] < 260) vis.push([{ ...q, kind: 'gate' }, c[2], 'lm']); }
   // здание-победитель голосования: vis.push([null, zc, 'm']) и mosque(...) — пример в выпуске 3
   vis.sort((a, b) => b[1] - a[1]);
   for (const [h, zc, kind] of vis) if (!kind && zc < 520 && !(opt.hide && opt.hide(h))) lotGround(g, h);   // газоны и дорожки — до домов
   const tags = [];
-  for (const [h, zc, kind] of vis) { if (kind === 'p') { prop(g, h, T); continue; } if (kind === 'd') { house(g, h, T, 1, 0, 0); continue; } if (kind === 'm') { mosque(g, 0, -58, T); continue; } if (opt.hide && opt.hide(h)) continue; const lit = h.status === 'dark' ? 0 : WX.lit; const inf = house(g, h, T, 1, lit, 0); if (!inf) continue; if (opt.pick) { const a = proj(h.x - h.w / 2, ground(h.z), h.z), b = proj(h.x + h.w / 2, inf.roofTop, h.z); opt.pick.push([h, Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1]), zc]); } if (zc < 220) extras(g, h, inf, T, lit);
+  for (const [h, zc, kind] of vis) { if (kind === 'p') { propX(g, h, T); continue; } if (kind === 'tm') { temurMonument(g, T); continue; } if (kind === 'lm') { landmark(g, h, T, WX.lit); continue; } if (kind === 't') { mover(g, h, T); continue; } if (kind === 's') { streetSign(g, h); continue; } if (kind === 'd') { house(g, h, T, 1, 0, 0); continue; } if (kind === 'm') { mosque(g, 0, -58, T); continue; } if (opt.hide && opt.hide(h)) continue; const lit = h.status === 'dark' ? 0 : WX.lit; const inf = house(g, h, T, 1, lit, 0); if (!inf) continue; if (opt.pick) { const a = proj(h.x - h.w / 2, ground(h.z), h.z), b = proj(h.x + h.w / 2, inf.roofTop, h.z); opt.pick.push([h, Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1]), zc]); } if (zc < 220) extras(g, h, inf, T, lit);
     if ((!opt.onlyHero && zc < (opt.tagDist || 60)) || h === opt.hero) { const p = proj(h.x, inf.roofTop + 1.2, h.z + 1); if (p[2] > 2) tags.push([h, p[0], p[1], h === opt.hero ? 54 : clamp(cam.f / p[2] * 1.1, 22, 40)]); } }
   if (opt.ghost && GHOST) { const x = GHOST.x, z = GHOST.z, b = ground(z + 7) + 0.3, P8 = [[x - 3.8, b, z], [x + 3.8, b, z], [x + 3.8, b + 5, z], [x - 3.8, b + 5, z], [x, b + 7.5, z]].map((q) => proj(...q));
     if (P8.every((q) => q[2] > 1)) { g.save(); g.setLineDash([10, 9]); g.strokeStyle = '#ffe2a0'; g.lineWidth = 4; g.beginPath(); g.moveTo(P8[0][0], P8[0][1]); g.lineTo(P8[1][0], P8[1][1]); g.lineTo(P8[2][0], P8[2][1]); g.lineTo(P8[4][0], P8[4][1]); g.lineTo(P8[3][0], P8[3][1]); g.closePath(); g.stroke(); g.restore(); const c = proj(x, b + 2.5, z + 3); addLight(c[0], c[1], 150, '255,214,140', 0.3); const t = proj(x, b + 9.5, z); tagsGhost = [opt.ghost, t[0], t[1]]; } }
   { const m = WM.getContext('2d'); m.setTransform(1, 0, 0, 1, 0, 0); m.clearRect(0, 0, cw, ch); m.drawImage(WL, 0, 0);
     g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.fillStyle = WX.tint; g.fillRect(0, 0, cw, ch); g.globalCompositeOperation = 'destination-in'; g.drawImage(WM, 0, 0); g.restore(); }
   G.save(); G.setTransform(1, 0, 0, 1, 0, 0); G.drawImage(WL, 0, 0); G.restore(); g = G; setOCC(opt.pick && opt.pick.length ? opt.pick : null); drawLights(g); setOCC(null);
+  { const hgt = cam.y - ground(cam.z + 40); if (hgt > 45 && !opt.hero) { const a = clamp((hgt - 45) / 40); for (const [n, x, z] of DCENT) { const p = proj(x, ground(z) + 25, z); if (p[2] < 5 || p[2] > 900 || p[0] < -100 || p[0] > E.W + 100 || p[1] < 0 || p[1] > E.H) continue; const fs = clamp(16000 / p[2], 18, 46); g.save(); g.globalAlpha = a; g.font = `900 ${fs}px Rubik`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round'; g.lineWidth = fs / 4; g.strokeStyle = 'rgba(30,22,40,0.8)'; g.strokeText(n.toUpperCase(), p[0], p[1]); g.fillStyle = '#ffe9b8'; g.fillText(n.toUpperCase(), p[0], p[1]); g.restore(); } } }
   tags.sort((a, b) => (a[0] === opt.hero) - (b[0] === opt.hero) || a[3] - b[3]);
   if (opt.ghost && tagsGhost) { card(g, opt.ghost + '?', tagsGhost[1], tagsGhost[2] - 54, 54, { bg: '#ffcf7a' }); tagsGhost = null; }
   const placed = []; for (const [h, x, y, s] of tags.reverse()) { if (y < 60 || y > E.H - 40) continue; g.font = `900 ${s}px Rubik`; const w = g.measureText(h.nickname).width + s; const r = [x - w / 2, y - s * 1.8, x + w / 2, y]; if (placed.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) continue; placed.push(r); card(g, h.nickname, x, y - s, s, { bg: h === opt.hero ? '#ffcf7a' : '#fff6e4', alpha: h.status === 'dark' ? 0.6 : 1 }); }
 }
-let T0 = performance.now(), lastMove = 1, hiq = false;
+let T0 = performance.now(), lastMove = 1, hiq = false, lastDraw = 0, DT = 30, ANIM_MS = 50;
 function frame(now) {
   const T = (now - T0) / 1000;
   if (fly) { const k = clamp((now - fly.t0) / fly.d), e = ease.inOut(k); const a = fly.a, b = fly.b, up = Math.sin(k * Math.PI) * fly.hop;
     Object.assign(C, { x: lerp(a.x, b.x, e), y: lerp(a.y, b.y, e) + up, z: lerp(a.z, b.z, e) - up * 0.6 * fly.arc, p: lerp(a.p, b.p, e) + Math.sin(k * Math.PI) * 0.15 * fly.arc, f: lerp(a.f, b.f, e), yaw: lerp(a.yaw || 0, b.yaw || 0, e) }); if (k >= 1 && fly.done) fly.done(); if (k >= 1) fly = null; dirty = true; }
   const moving = !!fly || !!drag; if (!moving && lastMove && now - lastMove > 120 && !hiq) { hiq = true; dirty = true; } if (moving) { lastMove = now; hiq = false; }
-  if (dirty) { setLOD(hiq ? 480 : 150); setCam(C); g.setTransform(E.PX, 0, 0, E.PX, 0, 0);
-    safe(g);
-    PICK = []; drawWorld(g, Math.floor(T * 4) / 4, { pick: PICK, ghost: ghostNick, hero: target, hide: target ? hideFor(target) : (ghostNick && GHOST ? (h) => h.z < GHOST.z - 1 && h.z > GHOST.z - 40 && Math.abs(h.x - GHOST.x) < 22 : null) }); dirty = false; }
+  // город живёт: машины и люди двигаются, кадр перерисовываем постоянно (частота подстраивается под телефон)
+  if (ROOM) { requestAnimationFrame(frame); return; }
+  if (!dirty && now - lastDraw > ANIM_MS && C.y - ground(C.z + 40) < 260 && !document.hidden) dirty = true;
+  if (dirty) { setLOD(hiq ? 320 : 150); setCam(C); g.setTransform(E.PX, 0, 0, E.PX, 0, 0);
+    safe(g); const t0 = performance.now();
+    PICK = []; drawWorld(g, T, { pick: PICK, ghost: ghostNick, hero: target, hide: target ? hideFor(target) : (ghostNick && GHOST ? (h) => h.z < GHOST.z - 1 && h.z > GHOST.z - 40 && Math.abs(h.x - GHOST.x) < 22 : null) }); dirty = false; lastDraw = now; const dt = performance.now() - t0; DT = DT * 0.9 + dt * 0.1; ANIM_MS = clamp(DT * 2.2, 33, 160); window.__dt = DT; }
   requestAnimationFrame(frame);
 }
 const fx = document.getElementById('fx'), fg = fx.getContext('2d');
@@ -118,7 +128,7 @@ function find(q) {
   ghostNick = null; $('#ghost').hidden = true;
   msg.textContent = ''; inspect(h);
 }
-function neighbours(h) { return HOUSES.filter((x) => x !== h && x.street === h.street).sort((a, b) => Math.hypot(a.x - h.x, a.z - h.z) - Math.hypot(b.x - h.x, b.z - h.z)).slice(0, 4); }
+function neighbours(h) { return HOUSES.filter((x) => x !== h && x.row === h.row).sort((a, b) => Math.hypot(a.x - h.x, a.z - h.z) - Math.hypot(b.x - h.x, b.z - h.z)).slice(0, 4); }
 function placeBars() { const hgt = info.hidden ? 0 : info.offsetHeight; $('#orbitbar').style.bottom = `calc(env(safe-area-inset-bottom) + ${hgt + 24}px)`; $('#tools').style.bottom = `calc(env(safe-area-inset-bottom) + ${hgt + 84}px)`; }
 addEventListener('resize', () => requestAnimationFrame(placeBars));
 // ---- улучшение домов: друзья по твоей ссылке ----
@@ -132,7 +142,7 @@ function showInfo(h) {
   renderLvl(h, null); refCount(h.nickname).then((n) => { if (target === h) { renderLvl(h, n); requestAnimationFrame(placeBars); } });
   $('#nbrs').hidden = true; $('#nbtn').textContent = 'Qoʻshnilar ▾';
   $('#nbrs').innerHTML = neighbours(h).map((x) => `<button class="chip" data-n="${x.nickname}">${x.nickname}</button>`).join('');
-  $('#nick').textContent = h.nickname; $('#addr').textContent = `${h.street}-koʻcha · ${h.num || 1}-uy`;
+  $('#nick').textContent = h.nickname; $('#addr').textContent = h.addr;
   $('#status').textContent = h.status === 'dark' ? 'Chiroq oʻchiq. @uyla.city ga obuna boʻl — va u yonadi!' : (h.rank < 6 || h.id <= 6 ? 'Shaharning ilk aholisidan biri.' : `${HOUSES.length} aholidan №${h.id}`);
   info.hidden = false; history.replaceState(null, '', '#' + h.nickname); requestAnimationFrame(placeBars);
 }
@@ -143,7 +153,7 @@ msg.addEventListener('click', (e) => { const n = e.target.dataset?.n; if (n) { e
 $('#nbtn').onclick = () => { const n = $('#nbrs'); n.hidden = !n.hidden; $('#nbtn').textContent = n.hidden ? 'Qoʻshnilar ▾' : 'Qoʻshnilar ▴'; requestAnimationFrame(placeBars); };
 $('#nbrs').addEventListener('click', (e) => { const n = e.target.dataset?.n; if (n) { $('#q').value = n; find(n); } });
 $('#invite').onclick = async () => { if (!target) return; const url = location.origin + '/?ref=' + encodeURIComponent(target.nickname) + '#' + encodeURIComponent(target.nickname);
-  const text = `UYLA CITY da mening oʻz uyim bor, ${target.street}-koʻcha. Havola orqali kir, oʻz uyingni top — mening uyim kattaroq boʻladi:`;
+  const text = `UYLA CITY da mening oʻz uyim bor: ${target.addr}. Havola orqali kir, oʻz uyingni top — mening uyim kattaroq boʻladi:`;
   try { if (navigator.share) await navigator.share({ text, url }); else { await navigator.clipboard.writeText(text + ' ' + url); $('#invite').textContent = 'Havola nusxalandi'; setTimeout(() => ($('#invite').textContent = 'Uyni kattalashtirish'), 2000); } } catch (e) {} };
 { const ref = new URLSearchParams(location.search).get('ref'); if (ref && /^[A-Za-z0-9._]{1,30}$/.test(ref) && BY.has(ref.toLowerCase())) { let done = null; try { done = localStorage.getItem('tlc_ref'); } catch (e) {}
   if (!done) { refCount(ref, true); try { localStorage.setItem('tlc_ref', ref); } catch (e) {} } history.replaceState(null, '', location.pathname + location.hash); } }
@@ -212,7 +222,7 @@ async function storyCard(h) {
   q.font = '800 58px Rubik'; q.fillStyle = '#fff3dc'; q.strokeStyle = '#1e1628'; q.lineWidth = 10; q.strokeText('Mening uyim paydo boʻldi', 540, 300); q.fillText('Mening uyim paydo boʻldi', 540, 300);
   q.font = '900 96px Rubik'; q.fillStyle = '#ffcf7a'; q.strokeText('UYLA CITY da', 540, 410); q.fillText('UYLA CITY da', 540, 410);
   const bot = q.createLinearGradient(0, 1400, 0, 1920); bot.addColorStop(0, 'rgba(22,16,32,0)'); bot.addColorStop(1, 'rgba(22,16,32,0.92)'); q.fillStyle = bot; q.fillRect(0, 1400, 1080, 520);
-  q.font = '800 44px Rubik'; q.fillStyle = '#fff3dc'; q.fillText(`${h.street}-koʻcha · ${h.num || 1}-uy`, 540, 1560);
+  q.font = '800 44px Rubik'; q.fillStyle = '#fff3dc'; q.font = '700 36px Rubik'; q.fillStyle = '#ffcf7a'; q.fillText(`${h.dist} tumani`, 540, 1495); q.font = '800 44px Rubik'; q.fillStyle = '#fff3dc'; q.fillText(`${h.sname}, ${h.snum}-uy`, 540, 1560);
   q.fillStyle = '#ffcf7a'; q.beginPath(); q.roundRect(250, 1610, 580, 100, 50); q.fill(); q.font = '900 50px Rubik'; q.fillStyle = '#1e1628'; q.fillText('@uyla.city', 540, 1678);
   return new Promise((r) => c.toBlob(r, 'image/png'));
 }
@@ -224,5 +234,18 @@ $('#story').onclick = async () => { if (!target) return; const b = $('#story'); 
   } catch (e) {} b.disabled = false; b.textContent = 'Storiesga'; };
 $('#wcount').textContent = $('#count').textContent = HOUSES.filter((h) => h.status !== 'dark').length.toLocaleString('uz-UZ');
 
+// ---- интерьер: заходим в дом ----
+let ROOM = null; const rc = document.getElementById('rc'), rg = rc.getContext('2d');
+function roomLoop(now) { if (!ROOM) return; const r = Math.min(devicePixelRatio || 1, 2), w = innerWidth, hh = innerHeight; if (rc.width !== Math.round(w * r)) { rc.width = Math.round(w * r); rc.height = Math.round(hh * r); }
+  const sc = Math.max(rc.width / 1080, rc.height / 1920); rg.setTransform(1, 0, 0, 1, 0, 0); rg.fillStyle = '#1e1628'; rg.fillRect(0, 0, rc.width, rc.height);
+  rg.setTransform(sc, 0, 0, sc, (rc.width - 1080 * sc) / 2, (rc.height - 1920 * sc) / 2 - 150 * sc); safe(rg);
+  drawRoom(rg, ROOM, now / 1000, WX.lit > 0.5, ROOM.status === 'dark'); requestAnimationFrame(roomLoop); }
+function openRoom(h) { ROOM = h; $('#rnick').textContent = h.nickname + ' uyi'; $('#raddr').textContent = h.addr;
+  $('#ritems').innerHTML = h.status === 'dark' ? '<span class="chip">Chiroq oʻchiq. @uyla.city ga obuna boʻl — uy yonadi!</span>' : roomItems(h).map((t) => `<span class="chip">${t}</span>`).join('');
+  $('#room').hidden = false; requestAnimationFrame(roomLoop); }
+$('#enter').onclick = () => { if (target) openRoom(target); };
+$('#rclose').onclick = () => { ROOM = null; $('#room').hidden = true; dirty = true; };
+window.__room = (n) => { const h = BY.get(n.toLowerCase()); if (h) openRoom(h); };
+window.__cam = (c) => { fly = null; if (c.dy != null) { c = { ...c, y: ground(c.z + 40) + c.dy }; } Object.assign(C, c); dirty = true; };
 applyWX(); loadWeather(); setInterval(applyWX, 60000); setInterval(loadWeather, 20 * 60000);
 document.fonts.load('900 40px Rubik').then(() => { resize(); requestAnimationFrame(frame); requestAnimationFrame(live); $('#loading').remove(); if (location.hash.length > 1) { $('#welcome').classList.add('gone'); $('#q').value = decodeURIComponent(location.hash.slice(1)); find($('#q').value); } else setTimeout(() => $('#wq').focus({ preventScroll: true }), 600); });
