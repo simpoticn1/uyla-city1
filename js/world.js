@@ -580,6 +580,7 @@ export function extras(g, H, inf, T, lit) {
   // баня рисуется в заднем дворе (yardPart)
   if (S.mailbox) { const mx = H.x - H.w / 2 - 1.2, mz = H.z - 1.2, y = ground(mz); const a = proj(mx, y, mz), b = proj(mx, y + 1.1, mz), s = cam.f / a[2]; g.strokeStyle = '#3a2a20'; g.lineWidth = 0.12 * s; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); g.fillStyle = '#2f6f9f'; g.beginPath(); g.roundRect(b[0] - 0.45 * s, b[1] - 0.5 * s, 0.9 * s, 0.55 * s, 0.2 * s); g.fill(); g.strokeStyle = '#1e1628'; g.lineWidth = 2; g.stroke();
     const fs = Math.max(11, 0.42 * s); g.font = `900 ${fs}px "Rubik"`; const tw = g.measureText(S.mailbox).width; g.fillStyle = '#fff6e4'; g.fillRect(b[0] - tw / 2 - 6, b[1] - 0.5 * s - fs - 8, tw + 12, fs + 6); g.fillStyle = '#1e1628'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(S.mailbox, b[0], b[1] - 0.5 * s - fs / 2 - 5); }
+  if (S.shop) shopNear(g, H, T, lit);
   if (S.flowers) for (let i = 0; i < 12; i++) { const p = proj(H.x - H.w / 2 + i * H.w / 11, ground(H.z - 0.6) + 0.3, H.z - 0.6), s = cam.f / p[2]; g.fillStyle = ['#e85a8a', '#f0c040', '#ffffff', '#d86ad8'][i % 4]; g.beginPath(); g.arc(p[0], p[1], 0.22 * s, 0, 7); g.fill(); }
 
   // ---------- жизнь во дворе ----------
@@ -663,7 +664,7 @@ export function districtOf(x, z) {
   if (th >= -30 && th < 30) return 'Yunusobod'; if (th >= 30 && th < 75) return 'Mirzo Ulugʻbek'; if (th >= 75 && th < 120) return 'Yashnobod'; if (th >= 120 && th < 160) return 'Bektemir';
   if (th >= 160 || th < -160) return 'Sergeli'; if (th >= -160 && th < -115) return 'Chilonzor'; if (th >= -115 && th < -70) return 'Uchtepa'; return 'Olmazor';
 }
-const VN = { 0: 'Amir Temur shoh koʻchasi', 1: 'Buyuk Ipak yoʻli', '-1': 'Beruniy shoh koʻchasi', 2: 'Mustaqillik shoh koʻchasi', '-2': 'Bunyodkor shoh koʻchasi', 3: 'Fargʻona yoʻli', '-3': 'Farobiy koʻchasi', 4: 'Parkent koʻchasi', '-4': 'Qoraqamish koʻchasi' };
+const VN = { 0: 'Amir Temur shoh koʻchasi', 1: 'Buyuk Ipak yoʻli', '-1': 'Beruniy shoh koʻchasi', 2: 'Mustaqillik shoh koʻchasi', '-2': 'Bunyodkor shoh koʻchasi', 3: 'Fargʻona yoʻli', '-3': 'Farobiy koʻchasi', 4: 'Parkent koʻchasi', '-4': 'Qoraqamish koʻchasi', 5: 'Toshkent halqa yoʻli' };
 export const rowOf = (z) => Math.round((z - 15) / 32);
 export function rowName(j, x = 0) { const d = districtOf(x, j * 32 + 15), L = DIST[d]; return L[((j % L.length) + L.length) % L.length] + ' koʻchasi'; }
 export function colName(b) { return VN[b] || 'Yangi koʻcha'; }
@@ -681,12 +682,12 @@ const carType = (sd, bus) => { const t = Math.floor(sd * 997) % 20; return bus &
 export function movers(T, R = 150) {
   const out = [], jz = Math.round(cam.z / 32), bx = Math.round((cam.x + 5) / 138);
   const lane = (key, a, b, P, v, ph, mk) => { const off = ph + v * T; for (let k = Math.floor((a - off) / P) - 1; k <= Math.ceil((b - off) / P) + 1; k++) { const s = off + k * P; if (s < a || s > b) continue; const sd = H01(key * 13.7 + k * 7.31); if (sd < 0.35) continue; mk(s, sd, k); } };
-  for (let j = jz - 8; j <= jz + 8; j++) { const z = j * 32; if (z < -560 || z > 520 || Math.abs(z + 5 - cam.z - 60) > R) continue; const a = Math.max(-560, cam.x - R), b = Math.min(560, cam.x + R);
+  for (let j = jz - 8; j <= jz + 8; j++) { const z = j * 32; if (z < -680 || z > 600 || Math.abs(z + 5 - cam.z - 60) > R) continue; const a = Math.max(-560, cam.x - R), b = Math.min(700, cam.x + R);
     const bus = j % 4 === 0;
     lane(j * 3 + 1, a, b, 46, 9 + H01(j) * 4, H01(j * 1.3) * 46, (x, sd) => { const zz = z + 2.9; if (!inPlaza(x, zz)) out.push({ k: 'cx', x, z: zz, dir: 1, c: HC[Math.floor(sd * 97) % HC.length], ty: carType(sd, bus), a: fadeX(x, zz) }); });
     lane(j * 3 + 2, a, b, 52, -(8 + H01(j + 9) * 4), H01(j * 2.1) * 52, (x, sd) => { const zz = z + 5.2; if (!inPlaza(x, zz)) out.push({ k: 'cx', x, z: zz, dir: -1, c: HC[Math.floor(sd * 97) % HC.length], ty: carType(sd, bus), a: fadeX(x, zz) }); });
     for (const [sz, dir, key] of [[z + 0.75, 1, 5], [z + 9.1, -1, 6], [z + 0.9, -1, 7], [z + 8.95, 1, 8]]) lane(j * 11 + key, a, b, 21, dir * (1.1 + H01(j + key) * 0.5), H01(j * 3 + key) * 21, (x, sd, k) => { if (!inPlaza(x, sz) && sd > 0.5) out.push({ k: 'p', x, z: sz, dir, sd, ph: k * 1.7, a: fadeX(x, sz) }); }); }
-  for (let b = bx - 3; b <= bx + 3; b++) { const x = -5 + b * 138; if (x < -560 || x > 560 || Math.abs(x - cam.x) > R) continue; const a = Math.max(-560, cam.z - 40), e = Math.min(520, cam.z + R + 60);
+  for (let b = bx - 3; b <= bx + 3; b++) { const x = -5 + b * 138; if (x < -560 || x > 700 || Math.abs(x - cam.x) > R) continue; const a = Math.max(-680, cam.z - 40), e = Math.min(600, cam.z + R + 60);
     const ring = (lx, z) => { const dz = z + 2 - TEMUR.z, R = TEMUR.r - 2; return b === 0 && Math.abs(dz) < R ? Math.sign(lx) * Math.max(Math.abs(lx), Math.sqrt(R * R - dz * dz)) : lx; };   // объезд сквера Амира Темура
     lane(b * 5 + 101, a, e, 40, 10, H01(b * 1.7) * 40, (z, sd) => { if (!inPlaza(x + 6, z)) out.push({ k: 'cz', x: x + 5 + ring(1.6, z), z, dir: 1, c: HC[Math.floor(sd * 97) % HC.length], ty: carType(sd, b === 0), a: fadeZ(x + 6, z) }); });
     lane(b * 5 + 102, a, e, 44, -9.5, H01(b * 2.9) * 44, (z, sd) => { if (!inPlaza(x + 3, z)) out.push({ k: 'cz', x: x + 5 + ring(-1.6, z), z, dir: -1, c: HC[Math.floor(sd * 97) % HC.length], ty: carType(sd, b === 0), a: fadeZ(x + 3, z) }); });
@@ -739,7 +740,7 @@ function moverIn(g, q, T) { if (q.k === 'cx') carX(g, q.x, q.z, q.dir, q.c, q.ty
 // таблички на перекрёстках: синие, как в Ташкенте
 export function signs(R = 150) {
   const out = [], jz = Math.round(cam.z / 32), bx = Math.round((cam.x + 5) / 138);
-  for (let j = jz - 2; j <= jz + 6; j++) for (let b = bx - 2; b <= bx + 2; b++) { const x = -5 + b * 138, z = j * 32; if (x < -560 || x > 560 || z < -540 || z > 500) continue; for (const sx of [x - 1.0, x + 11.0]) if (!inPlaza(sx, z - 1) && Math.hypot(sx - TEMUR.x, z - 1 - TEMUR.z) > TEMUR.r + 2) out.push({ x: sx, z: z - 1.0, h: rowName(j, sx), v: colName(b), metro: ((j % 5) + 5) % 5 === 0 && b % 2 === 0 && sx > x }); }
+  for (let j = jz - 2; j <= jz + 6; j++) for (let b = bx - 2; b <= bx + 2; b++) { const x = -5 + b * 138, z = j * 32; if (x < -560 || x > 700 || z < -680 || z > 600) continue; for (const sx of [x - 1.0, x + 11.0]) if (!inPlaza(sx, z - 1) && Math.hypot(sx - TEMUR.x, z - 1 - TEMUR.z) > TEMUR.r + 2) out.push({ x: sx, z: z - 1.0, h: rowName(j, sx), v: colName(b), metro: ((j % 5) + 5) % 5 === 0 && b % 2 === 0 && sx > x }); }
   return out;
 }
 export function streetSign(g, q) {
@@ -753,7 +754,7 @@ export function streetSign(g, q) {
 }
 
 // ---------- ташкентские детали: чинары вдоль арыков, автобусные остановки ----------
-(() => { let n = 50000; for (let j = -17; j <= 15; j++) { const z = j * 32; for (let b = -4; b <= 3; b++) { const x0 = -5 + b * 138 + 10;
+(() => { let n = 50000; for (let j = -21; j <= 18; j++) { const z = j * 32; for (let b = -4; b <= 4; b++) { const x0 = -5 + b * 138 + 10;
   for (let k = 0; k <= 8; k++) { const x = x0 + k * 16; if (Math.abs(x) < 40 && z > -100 && z < -10) continue; if (H01(x * 0.71 + j * 1.3) < 0.18) continue; PROPS.push({ kind: 'chinar', x, z: z + 9.9, seed: n++, s: 0.85 + H01(x + j) * 0.35 }); }
   if (((j % 2) + 2) % 2 === 0 && !(Math.abs(x0 + 64) < 40 && z > -100 && z < -10)) PROPS.push({ kind: 'stop', x: x0 + 64, z: z + 9.3, seed: n++ }); } } })();
 function chinar(g, x, z, sc, T, seed) {   // чинара: светлый пятнистый ствол, широкая пышная крона
@@ -777,7 +778,7 @@ function busStop(g, x, z) {   // остановка «Bekat»: навес, ск�
 export function propX(g, q, T) { if (q.kind === 'chinar') return chinar(g, q.x, q.z, q.s, T, q.seed); if (q.kind === 'stop') return busStop(g, q.x, q.z); prop(g, q, T); }
 // арыки вдоль тротуаров — только рядом с камерой
 export function aryks(g, T) {
-  const jz = Math.round(cam.z / 32); for (let j = jz - 2; j <= jz + 6; j++) { const z = j * 32 + 9.55; if (z < -540 || z > 500) continue; const xa = Math.max(-560, cam.x - 140), xb = Math.min(560, cam.x + 140);
+  const jz = Math.round(cam.z / 32); for (let j = jz - 2; j <= jz + 6; j++) { const z = j * 32 + 9.55; if (z < -680 || z > 600) continue; const xa = Math.max(-560, cam.x - 140), xb = Math.min(700, cam.x + 140);
     for (let b = Math.floor((xa + 5) / 138); b <= Math.ceil((xb + 5) / 138); b++) { const x0 = Math.max(xa, -5 + b * 138 + 10), x1 = Math.min(xb, -5 + (b + 1) * 138); if (x1 <= x0) continue; if (z > -100 && z < -10 && x0 < 40 && x1 > -40) continue;
       groundQuad(g, x0, x1, z - 0.05, z + 0.45, '#4a5a5a', 0); groundQuad(g, x0, x1, z + 0.02, z + 0.38, '#5aa7c8', 0.15); } }
 }
@@ -873,7 +874,7 @@ export function anhor(g, T) {
 // ворота махалли над поперечными улицами
 export function gates() {
   const out = [], jz = Math.round(cam.z / 32), bx = Math.round((cam.x + 5) / 138);
-  for (let j = jz - 1; j <= jz + 8; j++) for (let b = bx - 2; b <= bx + 2; b++) { if (b === 0 || ((j * 7 + b * 3) % 3 + 3) % 3 !== 0) continue; const x = -5 + b * 138, z = j * 32 + 21; if (x < -560 || x > 560 || z < -500 || z > 470) continue;
+  for (let j = jz - 1; j <= jz + 8; j++) for (let b = bx - 2; b <= bx + 2; b++) { if (b === 0 || ((j * 7 + b * 3) % 3 + 3) % 3 !== 0) continue; const x = -5 + b * 138, z = j * 32 + 21; if (x < -560 || x > 700 || z < -660 || z > 580) continue;
     const nm = rowName(j, x + 20).replace(' koʻchasi', '') + ' mahallasi'; out.push({ x: x + 5, z, nm }); }
   return out;
 }
@@ -885,3 +886,77 @@ export function gate(g, q) {
   const t = proj(x, y0 + H - 0.65, z - 0.42); if (t[2] < 160) { const fs = clamp(0.55 * cam.f / t[2], 6, 30); g.font = `900 ${fs}px Rubik`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffffff'; g.fillText(q.nm, t[0], t[1] + fs * 0.35); }
 }
 export function landmark(g, q, T, lit) { if (q.kind === 'panel') panelBlock(g, q, T, lit); else if (q.kind === 'chorsu') chorsu(g, T); else if (q.kind === 'gate') gate(g, q); }
+
+// ---------- выпуск 4: дом-машина, перевёрнутый дом, «Бурдж», боевой дом с аирдропом, лавка у дома ----------
+function wheel3(g, x, y, z, r) { const p = proj(x, y, z); if (p[2] < 1) return; const s = cam.f / p[2]; g.fillStyle = '#1e1a24'; g.beginPath(); g.arc(p[0], p[1], r * s, 0, 7); g.fill(); g.fillStyle = '#c8ccd4'; g.beginPath(); g.arc(p[0], p[1], r * 0.5 * s, 0, 7); g.fill(); g.fillStyle = '#6a6e78'; g.beginPath(); g.arc(p[0], p[1], r * 0.18 * s, 0, 7); g.fill(); }
+function carhouse(g, H, q, T, lit) {   // дом в виде машины: кузов — первый этаж, кабина — второй
+  const { x0, x1, z0, z1, y0 } = q, col = H.wall || '#d8343a', y1 = y0 + 3.2 * q.hm, y2 = y1 + 2.6 * q.hm, w = x1 - x0;
+  box(g, x0, x1, y0 + 0.9, y1, z0, z1, col, { topCol: shade(col, 0.1) });
+  box(g, x0 + w * 0.22, x1 - w * 0.12, y1, y2, z0 + 0.6, z1 - 0.6, col, { topCol: shade(col, 0.15) });
+  onFront(g, x0 + w * 0.26, y1 + 0.35, w * 0.28, y2 - y1 - 0.7, z0 + 0.58, '#9ad0ea', 0.15); onFront(g, x0 + w * 0.58, y1 + 0.35, w * 0.26, y2 - y1 - 0.7, z0 + 0.58, '#9ad0ea', 0.15);
+  if (lit > 0.3) { onFront(g, x0 + w * 0.26, y1 + 0.35, w * 0.28, y2 - y1 - 0.7, z0 + 0.57, 'rgba(255,214,140,0.55)', 0); }
+  windowAt(g, x0 + 0.6, y0 + 1.6, 1.4, 1.1, z0, lit, T, 1); windowAt(g, x1 - 2.0, y0 + 1.6, 1.4, 1.1, z0, lit, T, 2);
+  onFront(g, H.x - 0.7, y0 + 0.9, 1.4, 2.1, z0 - 0.01, '#5a3424', 0); onFront(g, x0 + 2.2, y0 + 1.2, 0.08, 1.9, z0 - 0.02, shade(col, -0.3), 0); onFront(g, x1 - 2.3, y0 + 1.2, 0.08, 1.9, z0 - 0.02, shade(col, -0.3), 0);
+  onFront(g, x0 - 0.01, y0 + 1.5, 0.01, 0.01, z0, col, 0); box(g, x0 - 0.5, x0, y0 + 1.1, y0 + 2.0, z0 + 0.6, z1 - 0.6, '#c8ccd4');   // бампер
+  const hl = proj(x0 - 0.02, y0 + 2.3, z0 + 1.2); if (hl[2] > 1) { const s = cam.f / hl[2]; g.fillStyle = '#fff4c0'; g.beginPath(); g.arc(hl[0], hl[1], 0.4 * s, 0, 7); g.fill(); if (lit > 0.3) addLight(hl[0], hl[1], 5 * s, '255,240,190', 0.3); }
+  for (const [wx, wz] of [[x0 + 1.7, z0 - 0.05], [x1 - 1.7, z0 - 0.05]]) wheel3(g, wx, y0 + 1.1, wz, 1.15);
+  box(g, x0 + w * 0.3, x1 - w * 0.2, y2, y2 + 0.15, z0 + 1.2, z1 - 1.2, '#2a2a32');   // багажник на крыше
+  signBoard(g, H.x, y0 + 3.3 * q.hm - 0.1, Math.min(w * 0.6, 5), 0.8, z0 - 0.02, H.nickname, '#fff3dc');
+  return { door: [H.x, y0, z0], roofTop: y2 + 0.4, top: y2 };
+}
+function upside(g, H, q, T, lit) {   // перевёрнутый дом: крыша внизу, фундамент сверху
+  const { x0, x1, z0, z1, y0 } = q, rh = 2.8 * q.hm, wh = 4.4 * q.hm, xm = H.x, roof = H.roof || '#b5452f', wall = H.wall || '#f2e6c8';
+  face(g, [[x0 - 0.4, y0 + rh, z1], [x1 + 0.4, y0 + rh, z1], [x1 + 0.4, y0 + rh, z0], [x0 - 0.4, y0 + rh, z0]], shade(roof, -0.3), 0);
+  if (cam.x < xm) face(g, [[x0 - 0.4, y0 + rh, z0], [x0 - 0.4, y0 + rh, z1], [xm, y0, z1], [xm, y0, z0]], roof, -0.2); if (cam.x > xm) face(g, [[x1 + 0.4, y0 + rh, z0], [x1 + 0.4, y0 + rh, z1], [xm, y0, z1], [xm, y0, z0]], roof, -0.1);
+  face(g, [[x0 - 0.4, y0 + rh, z0], [x1 + 0.4, y0 + rh, z0], [xm, y0, z0]], roof, 0.05);
+  for (let i = 1; i < 5; i++) { const a = proj(lerp(x0 - 0.4, xm, i / 5), lerp(y0 + rh, y0, i / 5), z0 - 0.01), b = proj(lerp(x1 + 0.4, xm, i / 5), lerp(y0 + rh, y0, i / 5), z0 - 0.01); if (a[2] > 1) { g.strokeStyle = shade(roof, -0.35); g.lineWidth = 1.5; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); } }
+  const yw = y0 + rh, yt = yw + wh; box(g, x0, x1, yw, yt, z0, z1, wall, { topCol: '#7c7268' });
+  box(g, x0 - 0.3, x1 + 0.3, yt, yt + 0.6, z0 - 0.3, z1 + 0.3, '#7c7268', { topCol: '#5f9a40' });   // фундамент с травой сверху
+  windowAt(g, x0 + 0.8, yw + 0.7, 1.4, 1.3, z0, lit, T, 5); windowAt(g, x1 - 2.2, yw + 0.7, 1.4, 1.3, z0, lit, T, 6);
+  onFront(g, xm - 0.6, yt - 2.2, 1.2, 2.1, z0 - 0.01, '#6a4428', 0); const kb = proj(xm + 0.35, yt - 1.3, z0 - 0.02); if (kb[2] > 1) { const s = cam.f / kb[2]; g.fillStyle = '#e8c040'; g.beginPath(); g.arc(kb[0], kb[1], 0.1 * s, 0, 7); g.fill(); }
+  box(g, x1 - 1.6, x1 - 0.9, yw - 1.4, yw, z0 + 1.5, z0 + 2.2, '#8a4a3a');   // труба вниз
+  smoke(g, x1 - 1.25, yw - 1.6, z0 + 1.85, T, 0.6);
+  for (let k = 0; k < 6; k++) { const a = proj(xm + 2.0, yt - 0.3 - k * 0.4 + 0.2, z0 - 0.4), b = proj(xm + 2.8, yt - 0.3 - k * 0.4 + 0.2, z0 - 0.4); if (a[2] > 1) { g.strokeStyle = '#8a5a2a'; g.lineWidth = Math.max(1, 0.08 * cam.f / a[2]); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); } }
+  const tr = proj(x0 + 1.2, yt + 0.6, z0 + 2); if (tr[2] > 1 && tr[2] < 200) { const s = cam.f / tr[2]; g.fillStyle = '#4c7a3a'; g.beginPath(); g.arc(tr[0], tr[1] - 1.4 * s, 1.0 * s, 0, 7); g.fill(); g.fillStyle = '#6a4a2e'; g.fillRect(tr[0] - 0.1 * s, tr[1] - 0.6 * s, 0.2 * s, 0.6 * s); }
+  signBoard(g, xm, yw + 2.4, Math.min((x1 - x0) * 0.7, 5), 0.8, z0 - 0.02, H.nickname, '#fff3dc');
+  return { door: [xm, y0, z0], roofTop: yt + 0.8, top: yt };
+}
+function burj(g, H, q, T, lit) {   // ступенчатая серебристая башня со шпилем
+  const { z0, y0 } = q, X = H.x, d = q.d, segs = [[1.0, 0, 14], [0.78, 14, 24], [0.6, 24, 33], [0.44, 33, 40], [0.3, 40, 45]], W = (q.x1 - q.x0) / 2;
+  box(g, X - W - 0.6, X + W + 0.6, q.fb - 0.1, y0 + 0.3, z0 - 0.6, z0 + d + 0.6, '#9a9aa4', { topCol: '#b8bcc4' });
+  for (const [k, a, b] of segs) { const hw = W * k, dz = d * (1 - k) / 2, ya = y0 + a * q.hm, yb = y0 + b * q.hm; box(g, X - hw, X + hw, ya, yb, z0 + dz, z0 + d - dz, '#c4d4e4', { topCol: '#e8eef4' });
+    const fl = Math.round((b - a) / 1.6); for (let f = 0; f < fl; f++) { const yy = ya + (f + 0.25) * (yb - ya) / fl; onFront(g, X - hw + 0.15, yy, hw * 2 - 0.3, (yb - ya) / fl * 0.55, z0 + dz - 0.01, lit > 0.3 && H01(f * 7 + k * 31) < 0.6 ? '#ffd890' : '#5a7aa4', 0.12); }
+    onFront(g, X - hw * 0.15, ya, hw * 0.3, yb - ya, z0 + dz - 0.02, '#e8eef4', 0.1); }
+  const tp = proj(X, y0 + 45 * q.hm, z0 + d / 2), sp = proj(X, y0 + 54 * q.hm, z0 + d / 2); if (tp[2] > 1) { g.strokeStyle = '#d8dce4'; g.lineWidth = Math.max(1.5, 0.3 * cam.f / tp[2]); g.beginPath(); g.moveTo(tp[0], tp[1]); g.lineTo(sp[0], sp[1]); g.stroke();
+    if (Math.floor(T * 1.4) % 2) { g.fillStyle = 'rgba(255,80,80,0.4)'; g.beginPath(); g.arc(sp[0], sp[1], 8, 0, 7); g.fill(); g.fillStyle = '#ff6a6a'; g.beginPath(); g.arc(sp[0], sp[1], 2.5, 0, 7); g.fill(); } }
+  onFront(g, X - 1.0, y0 + 0.3, 2.0, 2.6, z0 - 0.02, '#3a4a6a', 0.1);
+  signBoard(g, X, y0 + 3.4, Math.min(W * 1.6, 5.5), 0.9, z0 - 0.03, H.nickname, '#fff3dc');
+  return { door: [X, y0, z0], roofTop: y0 + 46 * q.hm, top: y0 + 45 * q.hm };
+}
+function battle(g, H, q, T, lit) {   // камуфляжный дом с мешками песка и сбросом груза на парашюте
+  const { x0, x1, z0, z1, y0 } = q, top = y0 + 5.2 * q.hm, olive = '#6b7a3a';
+  box(g, x0, x1, y0, top, z0, z1, olive, { topCol: '#5a6830' });
+  const camo = ['#4a5628', '#8a8a4a', '#3a3a24']; for (let i = 0; i < 14; i++) { const p = proj(x0 + 0.5 + H01(i * 3.1) * (x1 - x0 - 1), y0 + 0.5 + H01(i * 5.7) * (top - y0 - 1), z0 - 0.01); if (p[2] < 1) continue; const s = cam.f / p[2]; g.fillStyle = camo[i % 3]; g.beginPath(); g.ellipse(p[0], p[1], (0.5 + H01(i) * 0.7) * s, (0.3 + H01(i * 2) * 0.4) * s, H01(i * 9) * 3, 0, 7); g.fill(); }
+  box(g, x0 - 0.2, x1 + 0.2, top, top + 0.7, z0 - 0.2, z1 + 0.2, '#4a5628'); for (let i = 0; i < 5; i++) box(g, x0 + 0.2 + i * (x1 - x0) / 5, x0 + (i + 0.6) * (x1 - x0) / 5, top + 0.7, top + 1.1, z0 - 0.2, z0 + 0.2, '#4a5628');
+  onFront(g, x0 + 1.0, y0 + 2.8, 2.6, 0.5, z0 - 0.02, '#1e1e1a', 0); onFront(g, x1 - 3.4, y0 + 2.8, 2.4, 0.5, z0 - 0.02, '#1e1e1a', 0);   // бойницы
+  onFront(g, H.x - 0.7, y0, 1.4, 2.2, z0 - 0.02, '#3a3a2a', 0);
+  for (let r = 0; r < 2; r++) for (let i = 0; i < 6 - r; i++) { const sx = x0 - 0.4 + (i + r * 0.5) * 1.15, sy = y0 + r * 0.45; if (sx > H.x - 1.4 && sx < H.x + 0.6) continue; box(g, sx, sx + 1.05, sy, sy + 0.45, z0 - 1.6, z0 - 1.0, '#c8b080', { topCol: '#d8c090' }); }   // мешки с песком
+  const cx = x1 - 2.0, cz = z0 + 2.0, cy = top + 0.7, drop = 3.5 + (Math.sin(T * 0.8) + 1) * 0.8;   // аирдроп
+  box(g, cx - 0.8, cx + 0.8, cy + drop, cy + drop + 1.3, cz - 0.8, cz + 0.8, '#c03a2a', { topCol: '#d84a3a' }); onFront(g, cx - 0.8, cy + drop + 0.55, 1.6, 0.2, cz - 0.81, '#f2c94c', 0);
+  const pc = proj(cx, cy + drop + 4.8, cz), pb = proj(cx, cy + drop + 1.3, cz); if (pc[2] > 1) { const s = cam.f / pc[2], sw = Math.sin(T * 1.6) * 0.25 * s; g.fillStyle = '#e8e0d0'; g.beginPath(); g.ellipse(pc[0] + sw, pc[1], 2.4 * s, 1.3 * s, 0, Math.PI, 0); g.fill(); g.fillStyle = '#d84a3a'; g.beginPath(); g.ellipse(pc[0] + sw, pc[1], 0.8 * s, 1.3 * s, 0, Math.PI, 0); g.fill();
+    g.strokeStyle = '#3a3a3a'; g.lineWidth = Math.max(1, 0.05 * s); g.beginPath(); for (const dx of [-2.3, -0.8, 0.8, 2.3]) { g.moveTo(pc[0] + sw + dx * s, pc[1]); g.lineTo(pb[0], pb[1]); } g.stroke();
+    const sm = proj(cx, cy + drop + 1.5, cz); g.fillStyle = 'rgba(200,60,60,0.25)'; for (let k = 0; k < 4; k++) { g.beginPath(); g.arc(sm[0] + Math.sin(T + k) * 0.4 * s, sm[1] + (k + ((T * 2) % 1)) * 0.6 * s, (0.4 + k * 0.15) * s, 0, 7); g.fill(); } }
+  signBoard(g, H.x, y0 + 3.6, Math.min((x1 - x0) * 0.6, 5), 0.8, z0 - 0.03, H.nickname, '#e8e0c8');
+  return { door: [H.x, y0, z0], roofTop: cy + drop + 5.4, top };
+}
+Object.assign(NEW, { carhouse, upside, burj, battle });
+// лавка «Doʻkon» рядом с домом
+export function shopNear(g, H, T, lit) {
+  if (!H.lot) return; const sx0 = H.lot[0] + 0.5, sx1 = H.x - H.w / 2 - 0.4, z0 = H.z - 0.5, z1 = H.z + 3.0, y0 = ground(z1) + 0.3, top = y0 + 3.0; if (sx1 - sx0 < 2.2) return;
+  const p = proj((sx0 + sx1) / 2, y0, z0); if (p[2] < 1 || p[2] > 220) return;
+  box(g, sx0, sx1, ground(z0) - 0.1, y0, z0 - 0.2, z1 + 0.2, '#7c7268', { top: false }); box(g, sx0, sx1, y0, top, z0, z1, '#f4ece0', { topCol: '#c8b89a' });
+  onFront(g, sx0 + 0.3, y0 + 0.3, sx1 - sx0 - 0.6, 1.6, z0 - 0.01, lit > 0.3 ? '#ffe0a0' : '#9ad0ea', 0.1);
+  for (let i = 0; i < 6; i++) { const xa = lerp(sx0 - 0.2, sx1 + 0.2, i / 6), xb = lerp(sx0 - 0.2, sx1 + 0.2, (i + 1) / 6); face(g, [[xa, top - 0.2, z0], [xb, top - 0.2, z0], [xb, top - 0.9, z0 - 1.0], [xa, top - 0.9, z0 - 1.0]], i % 2 ? '#ffffff' : '#2a7ab8', 0.05, { lw: 1 }); }
+  const t = proj((sx0 + sx1) / 2, top - 0.05, z0 - 0.02); if (t[2] < 160) { const s = cam.f / t[2], fs = Math.max(7, 0.42 * s); g.fillStyle = '#c0392b'; g.fillRect(t[0] - 1.3 * s, t[1] - 0.1 * s, 2.6 * s, 0.65 * s); g.font = `900 ${fs}px Rubik`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.fillText('DOʻKON', t[0], t[1] + 0.22 * s); }
+  for (const [i, c] of [[0, '#e0503a'], [1, '#f2c94c'], [2, '#5ab048']]) { const bx = sx0 + 0.3 + i * 0.9, bz = z0 - 0.9; box(g, bx, bx + 0.8, ground(bz), ground(bz) + 0.5, bz, bz + 0.6, '#b8824a'); const fp = proj(bx + 0.4, ground(bz) + 0.55, bz + 0.3); if (fp[2] > 1) { const s = cam.f / fp[2]; g.fillStyle = c; for (let k = 0; k < 4; k++) { g.beginPath(); g.arc(fp[0] + (k - 1.5) * 0.17 * s, fp[1] - (k % 2) * 0.1 * s, 0.13 * s, 0, 7); g.fill(); } } }
+}
